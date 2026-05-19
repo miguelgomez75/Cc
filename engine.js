@@ -204,6 +204,8 @@ function max(a,b,...) return math.max(a,b,...) end
 function log(x)   return math.log(x) end
 PI   = math.pi
 SIZE = ` + gridSize + `
+EMPTY=0 WHITE=1 GREY=2 BLACK=3 PEACH=4 PINK=5 PURPLE=6 RED=7
+ORANGE=8 YELLOW=9 LIGHTGREEN=10 GREEN=11 DARKBLUE=12 BLUE=13 LIGHTBLUE=14 BROWN=15 DARKBROWN=16
 function step(a,v)    return a>v and 1 or 0 end
 function sign(a)      if a>0 then return 1 elseif a<0 then return -1 else return 0 end end
 function clamp(v,a,b) return math.min(b,math.max(a,v)) end
@@ -229,7 +231,7 @@ function runCode(){
 
 // ── REPLICUBE ──
 function runReplicube(userCode){
-  voxelMap={};
+  const stagingMap={}; // build here, only commit on success
   const logs=[]; const MAX=15000; let n=0;
   const gs = gridSize;
 
@@ -260,7 +262,7 @@ end end end
       const z=fengari.lua.lua_tonumber(state,3);
       const ci=fengari.lua.lua_tonumber(state,4);
       const rgb=paletteRGB(ci);
-      if(rgb){ voxelMap[x+','+y+','+z]=rgb; n++; }
+      if(rgb){ stagingMap[x+','+y+','+z]=rgb; n++; }
       return 0;
     },
     _jsprint:(state)=>{
@@ -270,7 +272,7 @@ end end end
   }, (err)=>{
     if(err){ logMsg('// error: '+err,'log-error'); }
     else{
-      rebuildMeshes();
+      voxelMap=stagingMap; rebuildMeshes();
       logMsg('// ok — '+Object.keys(voxelMap).length+' voxels','log-success');
       if(n>=MAX) logMsg('// aviso: límite de voxels ('+MAX+') alcanzado','log-error');
       logs.forEach(l=>logMsg('// '+l,'log-line'));
@@ -280,7 +282,7 @@ end end end
 
 // ── REPLIPAINT ──
 function runReplipaint(userCode){
-  paintPixels={}; bgPaletteIdx=0;
+  const stagingPixels={}; let stagingBg=0;
   const logs=[]; const MAX=200000; let n=0;
 
   const W=Math.ceil(paintCanvas.offsetWidth /2/paintScale)+2;
@@ -314,10 +316,10 @@ end end
       const y=Math.round(fengari.lua.lua_tonumber(state,2));
       const ci=fengari.lua.lua_tonumber(state,3);
       const rgb=paletteRGB(ci);
-      if(rgb){ paintPixels[x+','+y]=rgb; n++; }
+      if(rgb){ stagingPixels[x+','+y]=rgb; n++; }
       return 0;
     },
-    _jssetbg:(state)=>{ bgPaletteIdx=fengari.lua.lua_tonumber(state,1); return 0; },
+    _jssetbg:(state)=>{ stagingBg=fengari.lua.lua_tonumber(state,1); return 0; },
     _jsprint:(state)=>{
       logs.push(fengari.to_jsstring(fengari.lua.lua_tostring(state,1)||fengari.to_luastring('')));
       return 0;
@@ -325,7 +327,7 @@ end end
   }, (err)=>{
     if(err){ logMsg('// error: '+err,'log-error'); }
     else{
-      redrawPaint();
+      paintPixels=stagingPixels; bgPaletteIdx=stagingBg; redrawPaint();
       logMsg('// ok — '+Object.keys(paintPixels).length+' pixels','log-success');
       if(n>=MAX) logMsg('// aviso: límite de pixels alcanzado','log-error');
       logs.forEach(l=>logMsg('// '+l,'log-line'));
@@ -442,7 +444,12 @@ editor.addEventListener('keydown',e=>{
   }
   if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();runCode();}
 });
-editor.addEventListener('input',()=>{updateLineNumbers();updateTokenCount();});
+let _autoRunTimer = null;
+editor.addEventListener('input',()=>{
+  updateLineNumbers(); updateTokenCount();
+  clearTimeout(_autoRunTimer);
+  _autoRunTimer = setTimeout(()=>runCode(), 800);
+});
 editor.addEventListener('scroll',()=>{document.getElementById('line-numbers').scrollTop=editor.scrollTop;});
 function updateLineNumbers(){
   const lines=editor.value.split('\n').length;
