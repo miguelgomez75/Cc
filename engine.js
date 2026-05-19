@@ -2,11 +2,11 @@
 //  STATE
 // ═══════════════════════════════════════════════════════════
 let currentMode  = 'replicube';
-let voxelMap     = {}; // "x,y,z" → [r,g,b]
-let paintPixels  = {}; // "x,y"   → [r,g,b]
+let voxelMap     = {};
+let paintPixels  = {};
 let bgPaletteIdx = 0;
 let showGrid = true, showAxes = true;
-let gridSize = 6; // rango -gridSize a +gridSize en xyz
+let gridSize = 6;
 
 // ═══════════════════════════════════════════════════════════
 //  THREE.JS
@@ -24,7 +24,7 @@ dl.position.set(20, 30, 20); scene.add(dl);
 const dl2 = new THREE.DirectionalLight(0x4488ff, 0.3);
 dl2.position.set(-10, -10, -10); scene.add(dl2);
 
-const voxGeo    = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+const voxGeo     = new THREE.BoxGeometry(0.95, 0.95, 0.95);
 const voxelGroup = new THREE.Group(); scene.add(voxelGroup);
 
 let gridHelper = null;
@@ -60,7 +60,7 @@ function buildBoundingBox() {
 buildBoundingBox();
 
 let isDragging = false, lastX = 0, lastY = 0;
-let theta = 0.7, phi = 0.6, radius = gridSize*4+4;
+let theta = 0.7, phi = 0.6, radius = gridSize * 4 + 4;
 function updateCamera() {
   camera.position.set(
     radius * Math.sin(theta) * Math.cos(phi),
@@ -80,11 +80,11 @@ window.addEventListener('mousemove', e => {
   lastX=e.clientX; lastY=e.clientY; updateCamera();
 });
 threeCanvas.addEventListener('wheel', e => {
-  radius = Math.max(5, Math.min(80, radius+e.deltaY*0.05));
+  radius = Math.max(5, Math.min(120, radius+e.deltaY*0.05));
   updateCamera(); e.preventDefault();
 }, {passive:false});
 
-let ltx=0,lty=0;
+let ltx=0, lty=0;
 threeCanvas.addEventListener('touchstart', e => { ltx=e.touches[0].clientX; lty=e.touches[0].clientY; });
 threeCanvas.addEventListener('touchmove', e => {
   if (currentMode!=='replicube') return;
@@ -184,9 +184,10 @@ paintCanvas.addEventListener('wheel',e=>{
 paintCanvas.addEventListener('contextmenu',e=>e.preventDefault());
 
 // ═══════════════════════════════════════════════════════════
-//  LUA HELPERS — inyectados en ambos modos
+//  LUA HELPERS
 // ═══════════════════════════════════════════════════════════
-function getLuaHelpers() { return `
+function getLuaHelpers() {
+  return `
 function abs(x)   return math.abs(x) end
 function floor(x) return math.floor(x) end
 function ceil(x)  return math.ceil(x) end
@@ -202,7 +203,7 @@ function min(a,b,...) return math.min(a,b,...) end
 function max(a,b,...) return math.max(a,b,...) end
 function log(x)   return math.log(x) end
 PI   = math.pi
-SIZE = ${gridSize}
+SIZE = ` + gridSize + `
 function step(a,v)    return a>v and 1 or 0 end
 function sign(a)      if a>0 then return 1 elseif a<0 then return -1 else return 0 end end
 function clamp(v,a,b) return math.min(b,math.max(a,v)) end
@@ -211,7 +212,7 @@ function mix(a,b,t)   return a+(b-a)*t end
 function lerp(a,b,t)  return mix(a,b,t) end
 function btoi(a)      return a and 1 or 0 end
 function pow(a,b)     return a^b end
-`;}
+`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -226,13 +227,13 @@ function runCode(){
   }catch(e){ logMsg('// runtime error: '+e.message,'log-error'); }
 }
 
-// ── REPLICUBE: código = cuerpo de función (x,y,z) → colorIndex ──
+// ── REPLICUBE ──
 function runReplicube(userCode){
   voxelMap={};
   const logs=[]; const MAX=15000; let n=0;
+  const gs = gridSize;
 
-  const luaCode=`
-${getLuaHelpers()}
+  const luaCode = getLuaHelpers() + `
 local _print=_jsprint
 function print(...)
   local p={} for _,v in ipairs({...}) do p[#p+1]=tostring(v) end
@@ -240,10 +241,12 @@ function print(...)
 end
 
 local function _cell(x,y,z)
-${userCode}
+` + userCode + `
 end
 
-for x=-${gridSize},${gridSize} do for y=-${gridSize},${gridSize} do for z=-${gridSize},${gridSize} do
+for x=-` + gs + `,` + gs + ` do
+for y=-` + gs + `,` + gs + ` do
+for z=-` + gs + `,` + gs + ` do
   local c=_cell(x,y,z)
   if type(c)=="number" and c>0 then _jscell(x,y,z,c) end
 end end end
@@ -268,14 +271,14 @@ end end end
     if(err){ logMsg('// error: '+err,'log-error'); }
     else{
       rebuildMeshes();
-      logMsg(`// ok — ${Object.keys(voxelMap).length} voxels`,'log-success');
-      if(n>=MAX) logMsg(`// aviso: límite de voxels (${MAX}) alcanzado`,'log-error');
+      logMsg('// ok — '+Object.keys(voxelMap).length+' voxels','log-success');
+      if(n>=MAX) logMsg('// aviso: límite de voxels ('+MAX+') alcanzado','log-error');
       logs.forEach(l=>logMsg('// '+l,'log-line'));
     }
   });
 }
 
-// ── REPLIPAINT: código = cuerpo de función (x,y) → colorIndex ──
+// ── REPLIPAINT ──
 function runReplipaint(userCode){
   paintPixels={}; bgPaletteIdx=0;
   const logs=[]; const MAX=200000; let n=0;
@@ -285,8 +288,7 @@ function runReplipaint(userCode){
   const x0=Math.floor(paintOffX)-W, x1=Math.floor(paintOffX)+W;
   const y0=Math.floor(paintOffY)-H, y1=Math.floor(paintOffY)+H;
 
-  const luaCode=`
-${getLuaHelpers()}
+  const luaCode = getLuaHelpers() + `
 local _print=_jsprint
 local _setbg=_jssetbg
 function print(...)
@@ -296,10 +298,10 @@ end
 function fill(c) _setbg(c or 0) end
 
 local function _pixel(x,y)
-${userCode}
+` + userCode + `
 end
 
-for x=${x0},${x1} do for y=${y0},${y1} do
+for x=` + x0 + `,` + x1 + ` do for y=` + y0 + `,` + y1 + ` do
   local c=_pixel(x,y)
   if type(c)=="number" and c>0 then _jspixel(x,y,c) end
 end end
@@ -324,14 +326,14 @@ end end
     if(err){ logMsg('// error: '+err,'log-error'); }
     else{
       redrawPaint();
-      logMsg(`// ok — ${Object.keys(paintPixels).length} pixels`,'log-success');
+      logMsg('// ok — '+Object.keys(paintPixels).length+' pixels','log-success');
       if(n>=MAX) logMsg('// aviso: límite de pixels alcanzado','log-error');
       logs.forEach(l=>logMsg('// '+l,'log-line'));
     }
   });
 }
 
-// ── Ejecutor Fengari genérico ──
+// ── Ejecutor Fengari ──
 function execLua(luaCode, fns, cb){
   try{
     const L=fengari.lauxlib.luaL_newstate();
@@ -359,7 +361,9 @@ function logMsg(text,cls='log-line'){
   div.appendChild(span); div.scrollTop=div.scrollHeight;
 }
 function clearConsole(){ document.getElementById('console').innerHTML=''; }
-function resetCamera(){ theta=0.7;phi=0.6;radius=28; updateCamera(); }
+function resetCamera(){
+  theta=0.7; phi=0.6; radius=gridSize*4+4; updateCamera();
+}
 function toggleGrid(){ showGrid=!showGrid; buildGrid(); document.getElementById('grid-btn').classList.toggle('active',showGrid); }
 function toggleAxes(){ showAxes=!showAxes; buildAxes(); document.getElementById('axes-btn').classList.toggle('active',showAxes); }
 function toggleDocs(){ document.getElementById('docs-panel').classList.toggle('open'); }
@@ -368,8 +372,6 @@ function onSizeSlider(val){
   document.getElementById('size-val').textContent = gridSize;
   buildGrid(); buildAxes(); buildBoundingBox();
   resetCamera();
-  // update Lua SIZE constant label in docs
-  voxelMap={}; rebuildMeshes();
 }
 function updateTokenCount(){
   const code=document.getElementById('code-editor').value;
@@ -445,12 +447,12 @@ editor.addEventListener('scroll',()=>{document.getElementById('line-numbers').sc
 function updateLineNumbers(){
   const lines=editor.value.split('\n').length;
   let html='';
-  for(let i=1;i<=lines;i++) html+=`<span>${i}</span>`;
+  for(let i=1;i<=lines;i++) html+='<span>'+i+'</span>';
   document.getElementById('line-numbers').innerHTML=html;
 }
 
 // ── Resize handle ──
-let resizing=false,resizeStartX=0,resizeStartW=0;
+let resizing=false, resizeStartX=0, resizeStartW=0;
 document.getElementById('resize-handle').addEventListener('mousedown',e=>{
   resizing=true; resizeStartX=e.clientX;
   resizeStartW=document.getElementById('editor-pane').offsetWidth;
