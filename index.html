@@ -43,6 +43,10 @@
       <button class="vbtn" onclick="resetCamera()">⟳ CAM</button>
       <button class="vbtn" id="grid-btn" onclick="toggleGrid()">⊞ GRID</button>
       <button class="vbtn" id="axes-btn" onclick="toggleAxes()">⊕ AXES</button>
+      <label id="size-label" class="vbtn" style="cursor:default;border-color:transparent">SIZE <span id="size-val">6</span></label>
+      <input id="size-slider" type="range" min="1" max="10" value="6" step="1"
+             oninput="onSizeSlider(this.value)"
+             style="width:72px;accent-color:var(--accent);cursor:pointer;vertical-align:middle">
     </div>
     <div id="viewport">
       <canvas id="three-canvas"></canvas>

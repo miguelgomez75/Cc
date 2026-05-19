@@ -6,6 +6,7 @@ let voxelMap     = {}; // "x,y,z" → [r,g,b]
 let paintPixels  = {}; // "x,y"   → [r,g,b]
 let bgPaletteIdx = 0;
 let showGrid = true, showAxes = true;
+let gridSize = 6; // rango -gridSize a +gridSize en xyz
 
 // ═══════════════════════════════════════════════════════════
 //  THREE.JS
@@ -30,8 +31,9 @@ let gridHelper = null;
 function buildGrid() {
   if (gridHelper) scene.remove(gridHelper);
   if (!showGrid) return;
-  gridHelper = new THREE.GridHelper(13, 13, 0x1c2a3a, 0x1c2a3a);
-  gridHelper.position.y = -6.5;
+  const s = gridSize * 2 + 1;
+  gridHelper = new THREE.GridHelper(s, s, 0x1c2a3a, 0x1c2a3a);
+  gridHelper.position.y = -(gridSize + 0.5);
   scene.add(gridHelper);
 }
 buildGrid();
@@ -40,18 +42,25 @@ let axesHelper = null;
 function buildAxes() {
   if (axesHelper) scene.remove(axesHelper);
   if (!showAxes) return;
-  axesHelper = new THREE.AxesHelper(7);
+  axesHelper = new THREE.AxesHelper(gridSize + 1);
   scene.add(axesHelper);
 }
 buildAxes();
 
-scene.add(new THREE.LineSegments(
-  new THREE.EdgesGeometry(new THREE.BoxGeometry(13, 13, 13)),
-  new THREE.LineBasicMaterial({ color: 0x1c2a3a })
-));
+let boundingBox = null;
+function buildBoundingBox() {
+  if (boundingBox) scene.remove(boundingBox);
+  const s = gridSize * 2 + 1;
+  boundingBox = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(s, s, s)),
+    new THREE.LineBasicMaterial({ color: 0x1c2a3a })
+  );
+  scene.add(boundingBox);
+}
+buildBoundingBox();
 
 let isDragging = false, lastX = 0, lastY = 0;
-let theta = 0.7, phi = 0.6, radius = 28;
+let theta = 0.7, phi = 0.6, radius = gridSize*4+4;
 function updateCamera() {
   camera.position.set(
     radius * Math.sin(theta) * Math.cos(phi),
@@ -177,7 +186,7 @@ paintCanvas.addEventListener('contextmenu',e=>e.preventDefault());
 // ═══════════════════════════════════════════════════════════
 //  LUA HELPERS — inyectados en ambos modos
 // ═══════════════════════════════════════════════════════════
-const LUA_HELPERS = `
+function getLuaHelpers() { return `
 function abs(x)   return math.abs(x) end
 function floor(x) return math.floor(x) end
 function ceil(x)  return math.ceil(x) end
@@ -193,7 +202,7 @@ function min(a,b,...) return math.min(a,b,...) end
 function max(a,b,...) return math.max(a,b,...) end
 function log(x)   return math.log(x) end
 PI   = math.pi
-SIZE = 6
+SIZE = ${gridSize}
 function step(a,v)    return a>v and 1 or 0 end
 function sign(a)      if a>0 then return 1 elseif a<0 then return -1 else return 0 end end
 function clamp(v,a,b) return math.min(b,math.max(a,v)) end
@@ -202,7 +211,8 @@ function mix(a,b,t)   return a+(b-a)*t end
 function lerp(a,b,t)  return mix(a,b,t) end
 function btoi(a)      return a and 1 or 0 end
 function pow(a,b)     return a^b end
-`;
+`;}
+}
 
 // ═══════════════════════════════════════════════════════════
 //  RUN
@@ -222,7 +232,7 @@ function runReplicube(userCode){
   const logs=[]; const MAX=15000; let n=0;
 
   const luaCode=`
-${LUA_HELPERS}
+${getLuaHelpers()}
 local _print=_jsprint
 function print(...)
   local p={} for _,v in ipairs({...}) do p[#p+1]=tostring(v) end
@@ -233,7 +243,7 @@ local function _cell(x,y,z)
 ${userCode}
 end
 
-for x=-6,6 do for y=-6,6 do for z=-6,6 do
+for x=-${gridSize},${gridSize} do for y=-${gridSize},${gridSize} do for z=-${gridSize},${gridSize} do
   local c=_cell(x,y,z)
   if type(c)=="number" and c>0 then _jscell(x,y,z,c) end
 end end end
@@ -276,7 +286,7 @@ function runReplipaint(userCode){
   const y0=Math.floor(paintOffY)-H, y1=Math.floor(paintOffY)+H;
 
   const luaCode=`
-${LUA_HELPERS}
+${getLuaHelpers()}
 local _print=_jsprint
 local _setbg=_jssetbg
 function print(...)
@@ -353,6 +363,14 @@ function resetCamera(){ theta=0.7;phi=0.6;radius=28; updateCamera(); }
 function toggleGrid(){ showGrid=!showGrid; buildGrid(); document.getElementById('grid-btn').classList.toggle('active',showGrid); }
 function toggleAxes(){ showAxes=!showAxes; buildAxes(); document.getElementById('axes-btn').classList.toggle('active',showAxes); }
 function toggleDocs(){ document.getElementById('docs-panel').classList.toggle('open'); }
+function onSizeSlider(val){
+  gridSize = parseInt(val);
+  document.getElementById('size-val').textContent = gridSize;
+  buildGrid(); buildAxes(); buildBoundingBox();
+  resetCamera();
+  // update Lua SIZE constant label in docs
+  voxelMap={}; rebuildMeshes();
+}
 function updateTokenCount(){
   const code=document.getElementById('code-editor').value;
   document.getElementById('token-count').textContent='tokens: '+(code.trim()===''?0:code.trim().split(/\s+/).length);
@@ -399,6 +417,8 @@ function switchMode(mode){
   document.getElementById('stats-overlay').style.display=is3D?'block':'none';
   document.getElementById('grid-btn').style.display=is3D?'':'none';
   document.getElementById('axes-btn').style.display=is3D?'':'none';
+  document.getElementById('size-label').style.display=is3D?'':'none';
+  document.getElementById('size-slider').style.display=is3D?'':'none';
   document.getElementById('docs-replicube').style.display=is3D?'block':'none';
   document.getElementById('docs-replipaint').style.display=is3D?'none':'block';
   const ed=document.getElementById('code-editor');
