@@ -8,6 +8,11 @@ let bgPaletteIdx = 0;
 let showGrid = true, showAxes = true;
 let gridSize = 6;
 let clipX = 6, clipY = 6, clipZ = 6;
+let hoverVoxel = null;
+let mouseViewX = 0, mouseViewY = 0;
+
+const PALETTE_NAMES = ['','WHITE','GREY','BLACK','PEACH','PINK','PURPLE','RED',
+  'ORANGE','YELLOW','LIGHTGREEN','GREEN','DARKBLUE','BLUE','LIGHTBLUE','BROWN','DARKBROWN'];
 
 // ═══════════════════════════════════════════════════════════
 //  THREE.JS SETUP
@@ -71,10 +76,67 @@ function buildBoundingBox() {
 }
 buildBoundingBox();
 
+// ── Voxel meshes + instance map for picking ──
+const matCache = {};
+function getMat(r,g,b) {
+  const k = Math.round(r*20)+','+Math.round(g*20)+','+Math.round(b*20);
+  if (!matCache[k]) matCache[k] = new THREE.MeshLambertMaterial({ color: new THREE.Color(r,g,b) });
+  return matCache[k];
+}
+
+let _instanceMap = new Map(); // InstancedMesh → [{key, colorIdx}]
+
+function rebuildMeshes() {
+  while (voxelGroup.children.length) {
+    voxelGroup.children[0].geometry.dispose();
+    voxelGroup.remove(voxelGroup.children[0]);
+  }
+  _instanceMap = new Map();
+  hoverVoxel = null;
+
+  const entries = Object.entries(voxelMap);
+  const visible = entries.filter(([key]) => {
+    const [x,y,z] = key.split(',').map(Number);
+    return x <= clipX && y <= clipY && z <= clipZ;
+  });
+  document.getElementById('voxel-count').textContent =
+    entries.length + (visible.length < entries.length ? ' ('+visible.length+' vis.)' : '');
+
+  // group by colorIdx
+  const byColor = {};
+  for (const [key, rgb] of visible) {
+    let colorIdx = 0;
+    for (let i = 1; i <= 16; i++) {
+      const p = paletteRGB(i);
+      if (p && Math.abs(p[0]-rgb[0]) < 0.02 && Math.abs(p[1]-rgb[1]) < 0.02 && Math.abs(p[2]-rgb[2]) < 0.02) {
+        colorIdx = i; break;
+      }
+    }
+    if (!byColor[colorIdx]) byColor[colorIdx] = { rgb, list: [] };
+    byColor[colorIdx].list.push({ key, colorIdx });
+  }
+
+  const dummy = new THREE.Object3D();
+  for (const { rgb, list } of Object.values(byColor)) {
+    const mesh = new THREE.InstancedMesh(voxGeo, getMat(...rgb), list.length);
+    list.forEach(({ key }, i) => {
+      const [x,y,z] = key.split(',').map(Number);
+      dummy.position.set(x, y, z); dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    voxelGroup.add(mesh);
+    _instanceMap.set(mesh, list);
+  }
+}
+
+function clearAll() {
+  if (currentMode === 'replicube') { voxelMap = {}; rebuildMeshes(); logMsg('// cleared', 'log-info'); }
+  else { paintPixels = {}; bgPaletteIdx = 0; redrawPaint(); logMsg('// canvas cleared', 'log-info'); }
+}
+
 // ── Camera orbit ──
 let isDragging = false, lastX = 0, lastY = 0;
-let hoverVoxel = null;
-let mouseViewX = 0, mouseViewY = 0;
 let theta = 0.7, phi = 0.6, radius = gridSize * 4 + 4;
 function updateCamera() {
   camera.position.set(
@@ -86,37 +148,74 @@ function updateCamera() {
 }
 updateCamera();
 
-const vpDiv = document.getElementById('viewport');
-vpDiv.addEventListener('mousedown', e => { isDragging=true; lastX=e.clientX; lastY=e.clientY; });
-window.addEventListener('mouseup', () => isDragging=false);
-window.addEventListener('mousemove', e => {
-  if (currentMode!=='replicube') return;
-  const rect = vpDiv.getBoundingClientRect();
-  mouseViewX = e.clientX - rect.left;
-  mouseViewY = e.clientY - rect.top;
-  if (isDragging) {
-    theta -= (e.clientX-lastX)*0.01;
-    phi = Math.max(-1.4, Math.min(1.4, phi+(e.clientY-lastY)*0.01));
-    lastX=e.clientX; lastY=e.clientY; updateCamera();
-    hoverVoxel = null;
-  } else {
-    pickVoxel(mouseViewX, mouseViewY, rect.width, rect.height);
-  }
-});
-vpDiv.addEventListener('mouseleave', () => { hoverVoxel = null; });
-vpDiv.addEventListener('wheel', e => {
-  radius = Math.max(5, Math.min(120, radius+e.deltaY*0.05));
-  updateCamera(); e.preventDefault();
-}, {passive:false});
+// All pointer events on the anno-canvas (topmost, but pointer-events will be enabled for it)
+// We handle everything there and pass through visually
+window.addEventListener('load', () => {
+  const vp = document.getElementById('viewport');
+  const ac = document.getElementById('anno-canvas');
 
-let ltx=0, lty=0;
-threeCanvas.addEventListener('touchstart', e => { ltx=e.touches[0].clientX; lty=e.touches[0].clientY; });
-threeCanvas.addEventListener('touchmove', e => {
-  if (currentMode!=='replicube') return;
-  theta -= (e.touches[0].clientX-ltx)*0.015;
-  phi = Math.max(-1.4, Math.min(1.4, phi+(e.touches[0].clientY-lty)*0.015));
-  ltx=e.touches[0].clientX; lty=e.touches[0].clientY; updateCamera(); e.preventDefault();
-}, {passive:false});
+  // Enable pointer events on anno-canvas so it receives mouse
+  ac.style.pointerEvents = 'auto';
+
+  ac.addEventListener('mousedown', e => {
+    isDragging = true; lastX = e.clientX; lastY = e.clientY;
+    hoverVoxel = null;
+  });
+  window.addEventListener('mouseup', () => { isDragging = false; });
+  ac.addEventListener('mouseleave', () => { hoverVoxel = null; });
+
+  window.addEventListener('mousemove', e => {
+    if (currentMode !== 'replicube') return;
+    const rect = ac.getBoundingClientRect();
+    mouseViewX = e.clientX - rect.left;
+    mouseViewY = e.clientY - rect.top;
+    if (isDragging) {
+      theta -= (e.clientX - lastX) * 0.01;
+      phi = Math.max(-1.4, Math.min(1.4, phi + (e.clientY - lastY) * 0.01));
+      lastX = e.clientX; lastY = e.clientY;
+      updateCamera();
+    } else {
+      pickVoxel(mouseViewX, mouseViewY);
+    }
+  });
+
+  ac.addEventListener('wheel', e => {
+    radius = Math.max(5, Math.min(120, radius + e.deltaY * 0.05));
+    updateCamera(); e.preventDefault();
+  }, { passive: false });
+
+  // touch
+  let ltx = 0, lty = 0;
+  ac.addEventListener('touchstart', e => { ltx = e.touches[0].clientX; lty = e.touches[0].clientY; });
+  ac.addEventListener('touchmove', e => {
+    if (currentMode !== 'replicube') return;
+    theta -= (e.touches[0].clientX - ltx) * 0.015;
+    phi = Math.max(-1.4, Math.min(1.4, phi + (e.touches[0].clientY - lty) * 0.015));
+    ltx = e.touches[0].clientX; lty = e.touches[0].clientY;
+    updateCamera(); e.preventDefault();
+  }, { passive: false });
+});
+
+// ── Raycaster ──
+const _raycaster = new THREE.Raycaster();
+function pickVoxel(mx, my) {
+  const W = threeCanvas.clientWidth, H = threeCanvas.clientHeight;
+  if (W === 0 || H === 0) return;
+  const nx = (mx / W) * 2 - 1;
+  const ny = -(my / H) * 2 + 1;
+  _raycaster.setFromCamera(new THREE.Vector2(nx, ny), camera);
+  const hits = _raycaster.intersectObjects(voxelGroup.children, false);
+  if (!hits.length) { hoverVoxel = null; return; }
+  const hit = hits[0];
+  const list = _instanceMap.get(hit.object);
+  if (!list || hit.instanceId == null) { hoverVoxel = null; return; }
+  const entry = list[hit.instanceId];
+  if (!entry) { hoverVoxel = null; return; }
+  const [x, y, z] = entry.key.split(',').map(Number);
+  const rgb = voxelMap[entry.key];
+  if (!rgb) { hoverVoxel = null; return; }
+  hoverVoxel = { x, y, z, rgb, colorIdx: entry.colorIdx, colorName: PALETTE_NAMES[entry.colorIdx] || '?' };
+}
 
 function resizeRenderer() {
   const vp = document.getElementById('viewport');
@@ -128,14 +227,12 @@ function resizeRenderer() {
 new ResizeObserver(resizeRenderer).observe(document.getElementById('viewport'));
 resizeRenderer();
 
-// ── Animate + annotation overlay ──
+// ── Annotation + tooltip overlay ──
 const annoCanvas = document.getElementById('anno-canvas');
 const annoCtx    = annoCanvas.getContext('2d');
 
 function drawAnnotations() {
-  // sync size to viewport (only reallocates when actually changed)
-  const vp = document.getElementById('viewport');
-  const W = vp.clientWidth, H = vp.clientHeight;
+  const W = threeCanvas.clientWidth, H = threeCanvas.clientHeight;
   if (annoCanvas.width !== W)  annoCanvas.width  = W;
   if (annoCanvas.height !== H) annoCanvas.height = H;
   annoCtx.clearRect(0, 0, W, H);
@@ -155,13 +252,8 @@ function drawAnnotations() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // For each axis pick the most visible parallel edge
-  [
-    { axis:'x', color:'#ff4466' },
-    { axis:'y', color:'#44ff88' },
-    { axis:'z', color:'#55aaff' },
-  ].forEach(({ axis, color }) => {
-    // 4 candidate edges per axis — pick the one whose outward normal faces camera most
+  [{ axis:'x', color:'#ff4466' }, { axis:'y', color:'#44ff88' }, { axis:'z', color:'#55aaff' }]
+  .forEach(({ axis, color }) => {
     const signs = [[-1,-1],[-1,1],[1,-1],[1,1]];
     let bestScore = -Infinity, bs1 = 1, bs2 = 1;
     signs.forEach(([s1,s2]) => {
@@ -172,124 +264,69 @@ function drawAnnotations() {
       const score = nx*cp.x + ny*cp.y + nz*cp.z;
       if (score > bestScore) { bestScore=score; bs1=s1; bs2=s2; }
     });
-
     function edgePt(t) {
-      if (axis==='x') return new THREE.Vector3(t,      bs1*g, bs2*g);
-      if (axis==='y') return new THREE.Vector3(bs1*g,  t,     bs2*g);
-      return                new THREE.Vector3(bs1*g, bs2*g,   t);
+      if (axis==='x') return new THREE.Vector3(t,     bs1*g, bs2*g);
+      if (axis==='y') return new THREE.Vector3(bs1*g, t,     bs2*g);
+      return                new THREE.Vector3(bs1*g, bs2*g, t);
     }
-
-    const pA = project(edgePt(-g));
-    const pB = project(edgePt( g));
+    const pA = project(edgePt(-g)), pB = project(edgePt(g));
     if (pA.behind && pB.behind) return;
-
-    const edgeDx = pB.x - pA.x, edgeDy = pB.y - pA.y;
+    const edgeDx = pB.x-pA.x, edgeDy = pB.y-pA.y;
     const edgeLen = Math.sqrt(edgeDx*edgeDx + edgeDy*edgeDy);
     if (edgeLen < 10) return;
-
-    // Perp vector pointing away from screen center
     const midX = (pA.x+pB.x)/2, midY = (pA.y+pB.y)/2;
     let px = -edgeDy/edgeLen, py = edgeDx/edgeLen;
-    if ((midX - W/2)*px + (midY - H/2)*py < 0) { px=-px; py=-py; }
-
-    // Draw tick + label for every integer
+    if ((midX-W/2)*px + (midY-H/2)*py < 0) { px=-px; py=-py; }
     for (let v = -g; v <= g; v++) {
       const tp = project(edgePt(v));
       if (tp.behind) continue;
-
-      const isZero  = v === 0;
-      const isEdge  = v === -g || v === g;
-      const alpha   = isEdge ? 1.0 : isZero ? 0.95 : 0.60;
+      const isEdge = v===-g || v===g, isZero = v===0;
+      const alpha = isEdge||isZero ? 1 : 0.6;
       const tickEnd = isEdge ? 10 : isZero ? 9 : 6;
-      const lw      = isZero || isEdge ? 1.5 : 0.8;
-
-      // tick mark
       ctx.beginPath();
-      ctx.moveTo(tp.x + px*3, tp.y + py*3);
-      ctx.lineTo(tp.x + px*tickEnd, tp.y + py*tickEnd);
-      ctx.strokeStyle = color;
-      ctx.globalAlpha = alpha;
-      ctx.lineWidth   = lw;
-      ctx.stroke();
-
-      // number label (skip crowded middle ones for large grids)
-      const skipLabel = (g > 6 && !isEdge && !isZero && Math.abs(v) % 2 !== 0);
-      if (!skipLabel) {
-        ctx.fillStyle   = color;
-        ctx.globalAlpha = alpha;
-        ctx.fillText(String(v), tp.x + px*18, tp.y + py*18);
+      ctx.moveTo(tp.x+px*3, tp.y+py*3);
+      ctx.lineTo(tp.x+px*tickEnd, tp.y+py*tickEnd);
+      ctx.strokeStyle = color; ctx.globalAlpha = alpha;
+      ctx.lineWidth = isEdge||isZero ? 1.5 : 0.8; ctx.stroke();
+      const skip = g > 6 && !isEdge && !isZero && Math.abs(v)%2 !== 0;
+      if (!skip) {
+        ctx.fillStyle = color; ctx.globalAlpha = alpha;
+        ctx.fillText(String(v), tp.x+px*18, tp.y+py*18);
       }
     }
     ctx.globalAlpha = 1;
   });
 
-  // ── Hover tooltip ──
+  // ── Tooltip ──
   if (hoverVoxel) {
     const { x, y, z, rgb, colorIdx, colorName } = hoverVoxel;
-    const sw = 10; // swatch size
     const coordLine = 'x:'+x+'  y:'+y+'  z:'+z;
     const colorLine = colorIdx+'  '+colorName;
     ctx.font = 'bold 11px monospace';
-    const lineW = Math.max(ctx.measureText(coordLine).width, ctx.measureText(colorLine).width + sw + 6);
-    const padX=10, padY=8, lineH=17;
-    const bw = lineW + padX*2;
+    const lineW = Math.max(ctx.measureText(coordLine).width, ctx.measureText(colorLine).width + 16);
+    const padX=10, padY=8, lineH=17, sw=10;
+    const bw = lineW + padX*2 + 4;
     const bh = lineH*2 + padY*2;
-    let bx = mouseViewX+16, by = mouseViewY - bh - 8;
-    if (bx+bw > W-4) bx = mouseViewX - bw - 8;
+    let bx = mouseViewX+16, by = mouseViewY-bh-8;
+    if (bx+bw > W-4) bx = mouseViewX-bw-8;
     if (by < 4) by = mouseViewY+12;
-    // background
-    ctx.globalAlpha = 0.93;
-    ctx.fillStyle = '#080c12';
+    // bg
+    ctx.globalAlpha = 0.93; ctx.fillStyle = '#080c12';
     roundRect(ctx, bx, by, bw, bh, 5); ctx.fill();
-    // border (colored with axis-like accent)
-    ctx.globalAlpha = 0.5;
-    ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1;
     roundRect(ctx, bx, by, bw, bh, 5); ctx.stroke();
     // coord line
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#b8ccd8';
+    ctx.globalAlpha = 1; ctx.fillStyle = '#b8ccd8'; ctx.textAlign = 'left';
     ctx.fillText(coordLine, bx+padX, by+padY+lineH*0.55);
-    // color swatch
+    // swatch
     const r8=Math.round(rgb[0]*255), g8=Math.round(rgb[1]*255), b8=Math.round(rgb[2]*255);
     ctx.fillStyle = 'rgb('+r8+','+g8+','+b8+')';
     roundRect(ctx, bx+padX, by+padY+lineH+4, sw, sw, 2); ctx.fill();
-    // color label
+    // color name
     ctx.fillStyle = '#b8ccd8';
     ctx.fillText(colorLine, bx+padX+sw+5, by+padY+lineH*1.6);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1; ctx.textAlign = 'center';
   }
-}
-
-// ── Voxel picking ──
-// instanceMap: maps InstancedMesh → array of {key, colorIdx}
-// so we can look up exact voxel from instanceId
-const _raycaster = new THREE.Raycaster();
-let _instanceMap = new Map(); // mesh → [{key, colorIdx}]
-
-const PALETTE_NAMES = ['','WHITE','GREY','BLACK','PEACH','PINK','PURPLE','RED',
-  'ORANGE','YELLOW','LIGHTGREEN','GREEN','DARKBLUE','BLUE','LIGHTBLUE','BROWN','DARKBROWN'];
-
-function pickVoxel(mx, my, W, H) {
-  _raycaster.setFromCamera(new THREE.Vector2((mx/W)*2-1, -(my/H)*2+1), camera);
-  const hits = _raycaster.intersectObjects(voxelGroup.children, false);
-  if (!hits.length) { hoverVoxel = null; return; }
-
-  const hit = hits[0];
-  const mesh = hit.object;
-  const list = _instanceMap.get(mesh);
-  if (!list) { hoverVoxel = null; return; }
-
-  const entry = list[hit.instanceId];
-  if (!entry) { hoverVoxel = null; return; }
-
-  const [x,y,z] = entry.key.split(',').map(Number);
-  const rgb = voxelMap[entry.key];
-  if (!rgb) { hoverVoxel = null; return; }
-
-  hoverVoxel = { x, y, z, rgb,
-    colorIdx: entry.colorIdx,
-    colorName: PALETTE_NAMES[entry.colorIdx] || '?'
-  };
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -299,62 +336,6 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
   ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
   ctx.closePath();
-}
-
-// ── Voxel meshes (with clip) ──
-const matCache = {};
-function getMat(r,g,b) {
-  const k = Math.round(r*20)+','+Math.round(g*20)+','+Math.round(b*20);
-  if (!matCache[k]) matCache[k] = new THREE.MeshLambertMaterial({color:new THREE.Color(r,g,b)});
-  return matCache[k];
-}
-function rebuildMeshes() {
-  while (voxelGroup.children.length) {
-    voxelGroup.children[0].geometry.dispose();
-    voxelGroup.remove(voxelGroup.children[0]);
-  }
-  _instanceMap = new Map();
-  hoverVoxel = null;
-
-  const entries = Object.entries(voxelMap);
-  const visible = entries.filter(([key]) => {
-    const [x,y,z] = key.split(',').map(Number);
-    return x <= clipX && y <= clipY && z <= clipZ;
-  });
-  document.getElementById('voxel-count').textContent =
-    entries.length + (visible.length < entries.length ? ' ('+visible.length+' vis.)' : '');
-
-  // Group by colorIdx (not just rgb float key) so instanceId maps cleanly
-  const byColor = {};
-  for (const [key, rgb] of visible) {
-    // find colorIdx
-    let colorIdx = 0;
-    for (let i=1; i<=16; i++) {
-      const p = paletteRGB(i);
-      if (p && Math.abs(p[0]-rgb[0])<0.02 && Math.abs(p[1]-rgb[1])<0.02 && Math.abs(p[2]-rgb[2])<0.02) {
-        colorIdx = i; break;
-      }
-    }
-    if (!byColor[colorIdx]) byColor[colorIdx] = { rgb, entries:[] };
-    byColor[colorIdx].entries.push({ key, colorIdx });
-  }
-
-  const dummy = new THREE.Object3D();
-  for (const { rgb, entries: colorEntries } of Object.values(byColor)) {
-    const mesh = new THREE.InstancedMesh(voxGeo, getMat(...rgb), colorEntries.length);
-    colorEntries.forEach(({ key }, i) => {
-      const [x,y,z] = key.split(',').map(Number);
-      dummy.position.set(x,y,z); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    voxelGroup.add(mesh);
-    _instanceMap.set(mesh, colorEntries);
-  }
-}
-
-function clearAll() {
-  if (currentMode==='replicube') { voxelMap={}; rebuildMeshes(); logMsg('// cleared','log-info'); }
-  else { paintPixels={}; bgPaletteIdx=0; redrawPaint(); logMsg('// canvas cleared','log-info'); }
 }
 
 (function animate() {
@@ -381,8 +362,8 @@ function redrawPaint() {
   const ctx=paintCtx;
   if (bgPaletteIdx>0) {
     const bg=paletteRGB(bgPaletteIdx);
-    ctx.fillStyle = bg ? `rgb(${Math.round(bg[0]*255)},${Math.round(bg[1]*255)},${Math.round(bg[2]*255)})` : '#090b0f';
-  } else { ctx.fillStyle='#090b0f'; }
+    ctx.fillStyle=bg?`rgb(${Math.round(bg[0]*255)},${Math.round(bg[1]*255)},${Math.round(bg[2]*255)})`:'#090b0f';
+  } else ctx.fillStyle='#090b0f';
   ctx.fillRect(0,0,paintCanvas.width,paintCanvas.height);
   if (paintScale>=4) {
     ctx.fillStyle='rgba(30,42,58,0.8)';
@@ -464,7 +445,6 @@ function runReplicube(userCode) {
   const stagingMap = {};
   const logs = []; const MAX = 15000; let n = 0;
   const gs = gridSize;
-
   const luaCode = getLuaHelpers() + `
 local _print=_jsprint
 function print(...)
@@ -481,41 +461,33 @@ for z=-` + gs + `,` + gs + ` do
   if type(c)=="number" and c>0 then _jscell(x,y,z,c) end
 end end end
 `;
-
   execLua(luaCode, {
     _jscell: (state) => {
-      if (n >= MAX) return 0;
-      const x=fengari.lua.lua_tonumber(state,1);
-      const y=fengari.lua.lua_tonumber(state,2);
-      const z=fengari.lua.lua_tonumber(state,3);
-      const ci=fengari.lua.lua_tonumber(state,4);
-      const rgb=paletteRGB(ci);
+      if (n>=MAX) return 0;
+      const x=fengari.lua.lua_tonumber(state,1), y=fengari.lua.lua_tonumber(state,2), z=fengari.lua.lua_tonumber(state,3);
+      const rgb=paletteRGB(fengari.lua.lua_tonumber(state,4));
       if (rgb) { stagingMap[x+','+y+','+z]=rgb; n++; }
       return 0;
     },
-    _jsprint: (state) => {
-      logs.push(fengari.to_jsstring(fengari.lua.lua_tostring(state,1)||fengari.to_luastring('')));
-      return 0;
-    }
+    _jsprint: (state) => { logs.push(fengari.to_jsstring(fengari.lua.lua_tostring(state,1)||fengari.to_luastring(''))); return 0; }
   }, (err) => {
-    if (err) { logMsg('// error: '+err,'log-error'); }
+    if (err) logMsg('// error: '+err,'log-error');
     else {
-      voxelMap = stagingMap; rebuildMeshes();
+      voxelMap=stagingMap; rebuildMeshes();
       logMsg('// ok — '+Object.keys(voxelMap).length+' voxels','log-success');
-      if (n >= MAX) logMsg('// aviso: límite ('+MAX+') alcanzado','log-error');
-      logs.forEach(l => logMsg('// '+l,'log-line'));
+      if (n>=MAX) logMsg('// aviso: límite alcanzado','log-error');
+      logs.forEach(l=>logMsg('// '+l,'log-line'));
     }
   });
 }
 
 function runReplipaint(userCode) {
-  const stagingPixels = {}; let stagingBg = 0;
-  const logs = []; const MAX = 200000; let n = 0;
-  const W=Math.ceil(paintCanvas.offsetWidth /2/paintScale)+2;
+  const stagingPixels={}; let stagingBg=0;
+  const logs=[]; const MAX=200000; let n=0;
+  const W=Math.ceil(paintCanvas.offsetWidth/2/paintScale)+2;
   const H=Math.ceil(paintCanvas.offsetHeight/2/paintScale)+2;
   const x0=Math.floor(paintOffX)-W, x1=Math.floor(paintOffX)+W;
   const y0=Math.floor(paintOffY)-H, y1=Math.floor(paintOffY)+H;
-
   const luaCode = getLuaHelpers() + `
 local _print=_jsprint
 local _setbg=_jssetbg
@@ -532,56 +504,44 @@ for x=` + x0 + `,` + x1 + ` do for y=` + y0 + `,` + y1 + ` do
   if type(c)=="number" and c>0 then _jspixel(x,y,c) end
 end end
 `;
-
   execLua(luaCode, {
     _jspixel: (state) => {
-      if (n >= MAX) return 0;
-      const x=Math.round(fengari.lua.lua_tonumber(state,1));
-      const y=Math.round(fengari.lua.lua_tonumber(state,2));
-      const ci=fengari.lua.lua_tonumber(state,3);
-      const rgb=paletteRGB(ci);
+      if (n>=MAX) return 0;
+      const x=Math.round(fengari.lua.lua_tonumber(state,1)), y=Math.round(fengari.lua.lua_tonumber(state,2));
+      const rgb=paletteRGB(fengari.lua.lua_tonumber(state,3));
       if (rgb) { stagingPixels[x+','+y]=rgb; n++; }
       return 0;
     },
     _jssetbg: (state) => { stagingBg=fengari.lua.lua_tonumber(state,1); return 0; },
-    _jsprint: (state) => {
-      logs.push(fengari.to_jsstring(fengari.lua.lua_tostring(state,1)||fengari.to_luastring('')));
-      return 0;
-    }
+    _jsprint: (state) => { logs.push(fengari.to_jsstring(fengari.lua.lua_tostring(state,1)||fengari.to_luastring(''))); return 0; }
   }, (err) => {
-    if (err) { logMsg('// error: '+err,'log-error'); }
+    if (err) logMsg('// error: '+err,'log-error');
     else {
       paintPixels=stagingPixels; bgPaletteIdx=stagingBg; redrawPaint();
       logMsg('// ok — '+Object.keys(paintPixels).length+' pixels','log-success');
-      if (n >= MAX) logMsg('// aviso: límite alcanzado','log-error');
-      logs.forEach(l => logMsg('// '+l,'log-line'));
+      if (n>=MAX) logMsg('// aviso: límite alcanzado','log-error');
+      logs.forEach(l=>logMsg('// '+l,'log-line'));
     }
   });
 }
 
 function execLua(luaCode, fns, cb) {
   try {
-    const L = fengari.lauxlib.luaL_newstate();
-    fengari.lualib.luaL_openlibs(L);
-    const { lua, lauxlib } = fengari;
-    for (const [name,fn] of Object.entries(fns)) {
-      lua.lua_pushcfunction(L, fn);
-      lua.lua_setglobal(L, fengari.to_luastring(name));
-    }
-    const status = lauxlib.luaL_dostring(L, fengari.to_luastring(luaCode));
-    if (status !== fengari.lua.LUA_OK) {
-      cb(fengari.to_jsstring(lua.lua_tostring(L,-1)).replace(/\[string.*?\]:/,'line'));
-    } else { cb(null); }
+    const L=fengari.lauxlib.luaL_newstate(); fengari.lualib.luaL_openlibs(L);
+    const{lua,lauxlib}=fengari;
+    for (const[name,fn] of Object.entries(fns)) { lua.lua_pushcfunction(L,fn); lua.lua_setglobal(L,fengari.to_luastring(name)); }
+    const status=lauxlib.luaL_dostring(L,fengari.to_luastring(luaCode));
+    if (status!==fengari.lua.LUA_OK) cb(fengari.to_jsstring(lua.lua_tostring(L,-1)).replace(/\[string.*?\]:/,'line'));
+    else cb(null);
   } catch(e) { cb(e.message); }
 }
 
 // ═══════════════════════════════════════════════════════════
-//  UI FUNCTIONS
+//  UI
 // ═══════════════════════════════════════════════════════════
-function logMsg(text, cls='log-line') {
+function logMsg(text,cls='log-line') {
   const div=document.getElementById('console');
-  const span=document.createElement('div');
-  span.className=cls; span.textContent=text;
+  const span=document.createElement('div'); span.className=cls; span.textContent=text;
   div.appendChild(span); div.scrollTop=div.scrollHeight;
 }
 function clearConsole() { document.getElementById('console').innerHTML=''; }
@@ -591,42 +551,34 @@ function toggleAxes()  { showAxes=!showAxes; buildAxes(); document.getElementByI
 function toggleDocs()  { document.getElementById('docs-panel').classList.toggle('open'); }
 
 function onSizeSlider(val) {
-  gridSize = parseInt(val);
-  document.getElementById('size-val').textContent = gridSize;
-  clipX = clipY = clipZ = gridSize;
-  ['x','y','z'].forEach(ax => {
-    const sl = document.getElementById('clip-'+ax);
-    if (sl) { sl.min = -gridSize; sl.max = gridSize; sl.value = gridSize; }
-    const lb = document.getElementById('clip-'+ax+'-val');
-    if (lb) lb.textContent = gridSize;
+  gridSize=parseInt(val);
+  document.getElementById('size-val').textContent=gridSize;
+  clipX=clipY=clipZ=gridSize;
+  ['x','y','z'].forEach(ax=>{
+    const sl=document.getElementById('clip-'+ax);
+    if(sl){sl.min=-gridSize;sl.max=gridSize;sl.value=gridSize;}
+    const lb=document.getElementById('clip-'+ax+'-val');
+    if(lb) lb.textContent=gridSize;
   });
-  voxelMap = {}; rebuildMeshes();
-  buildGrid(); buildAxes(); buildBoundingBox();
-  resetCamera();
+  voxelMap={}; rebuildMeshes();
+  buildGrid(); buildAxes(); buildBoundingBox(); resetCamera();
   logMsg('// tamaño cambiado a ±'+gridSize+' — vuelve a ejecutar','log-info');
 }
 
 function onClipSlider(axis, val) {
-  const v = parseInt(val);
-  document.getElementById('clip-'+axis+'-val').textContent = v;
-  if (axis==='x') clipX=v;
-  else if (axis==='y') clipY=v;
-  else clipZ=v;
-  buildAxes();
-  rebuildMeshes();
+  const v=parseInt(val);
+  document.getElementById('clip-'+axis+'-val').textContent=v;
+  if(axis==='x') clipX=v; else if(axis==='y') clipY=v; else clipZ=v;
+  buildAxes(); rebuildMeshes();
 }
 
 function updateTokenCount() {
-  const code = document.getElementById('code-editor').value;
-  document.getElementById('token-count').textContent = 'tokens: '+(code.trim()===''?0:code.trim().split(/\s+/).length);
+  const code=document.getElementById('code-editor').value;
+  document.getElementById('token-count').textContent='tokens: '+(code.trim()===''?0:code.trim().split(/\s+/).length);
 }
 function exportPNG() {
-  if (currentMode==='replicube') {
-    renderer.render(scene,camera);
-    const a=document.createElement('a'); a.href=threeCanvas.toDataURL('image/png'); a.download='replicube.png'; a.click();
-  } else {
-    const a=document.createElement('a'); a.href=paintCanvas.toDataURL('image/png'); a.download='replipaint.png'; a.click();
-  }
+  if(currentMode==='replicube'){renderer.render(scene,camera);const a=document.createElement('a');a.href=threeCanvas.toDataURL('image/png');a.download='replicube.png';a.click();}
+  else{const a=document.createElement('a');a.href=paintCanvas.toDataURL('image/png');a.download='replipaint.png';a.click();}
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -655,73 +607,61 @@ return (floor(d / 6) % 16) + 1`
 //  MODE SWITCH
 // ═══════════════════════════════════════════════════════════
 function switchMode(mode) {
-  currentMode = mode;
-  document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', (i===0&&mode==='replicube')||(i===1&&mode==='replipaint'));
+  currentMode=mode;
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active',(i===0&&mode==='replicube')||(i===1&&mode==='replipaint'));
   });
-  const is3D = mode==='replicube';
-  threeCanvas.style.display  = is3D ? 'block' : 'none';
-  annoCanvas.style.display   = is3D ? 'block' : 'none';
-  paintCanvas.style.display  = is3D ? 'none'  : 'block';
-  document.getElementById('viewport-label').textContent = is3D ? '3D VOXEL VIEW' : '2D PAINT VIEW';
-  document.getElementById('stats-overlay').style.display = is3D ? 'block' : 'none';
-  document.getElementById('grid-btn').style.display  = is3D ? '' : 'none';
-  document.getElementById('axes-btn').style.display  = is3D ? '' : 'none';
-  document.getElementById('size-label').style.display  = is3D ? '' : 'none';
-  document.getElementById('size-slider').style.display = is3D ? '' : 'none';
-  document.getElementById('clip-controls').style.display = is3D ? 'flex' : 'none';
-  document.getElementById('docs-replicube').style.display  = is3D ? 'block' : 'none';
-  document.getElementById('docs-replipaint').style.display = is3D ? 'none'  : 'block';
-  document.getElementById('code-editor').value = defaultCode[mode];
+  const is3D=mode==='replicube';
+  threeCanvas.style.display =is3D?'block':'none';
+  annoCanvas.style.display  =is3D?'block':'none';
+  paintCanvas.style.display =is3D?'none':'block';
+  document.getElementById('viewport-label').textContent=is3D?'3D VOXEL VIEW':'2D PAINT VIEW';
+  document.getElementById('stats-overlay').style.display=is3D?'block':'none';
+  document.getElementById('grid-btn').style.display=is3D?'':'none';
+  document.getElementById('axes-btn').style.display=is3D?'':'none';
+  document.getElementById('size-label').style.display=is3D?'':'none';
+  document.getElementById('size-slider').style.display=is3D?'':'none';
+  document.getElementById('clip-controls').style.display=is3D?'flex':'none';
+  document.getElementById('docs-replicube').style.display=is3D?'block':'none';
+  document.getElementById('docs-replipaint').style.display=is3D?'none':'block';
+  document.getElementById('code-editor').value=defaultCode[mode];
   updateLineNumbers(); updateTokenCount();
-  if (!is3D) setTimeout(()=>redrawPaint(), 50);
+  if(!is3D) setTimeout(()=>redrawPaint(),50);
 }
 
 // ═══════════════════════════════════════════════════════════
 //  EDITOR
 // ═══════════════════════════════════════════════════════════
-const editor = document.getElementById('code-editor');
-editor.addEventListener('keydown', e => {
-  if (e.key==='Tab') {
-    e.preventDefault();
-    const s=editor.selectionStart, en=editor.selectionEnd;
-    editor.value = editor.value.slice(0,s)+'  '+editor.value.slice(en);
-    editor.selectionStart = editor.selectionEnd = s+2;
-  }
-  if ((e.ctrlKey||e.metaKey) && e.key==='Enter') { e.preventDefault(); runCode(); }
+const editor=document.getElementById('code-editor');
+editor.addEventListener('keydown',e=>{
+  if(e.key==='Tab'){e.preventDefault();const s=editor.selectionStart,en=editor.selectionEnd;editor.value=editor.value.slice(0,s)+'  '+editor.value.slice(en);editor.selectionStart=editor.selectionEnd=s+2;}
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();runCode();}
 });
-let _autoRunTimer = null;
-editor.addEventListener('input', () => {
+let _autoRunTimer=null;
+editor.addEventListener('input',()=>{
   updateLineNumbers(); updateTokenCount();
-  clearTimeout(_autoRunTimer);
-  _autoRunTimer = setTimeout(()=>runCode(), 800);
+  clearTimeout(_autoRunTimer); _autoRunTimer=setTimeout(()=>runCode(),800);
 });
-editor.addEventListener('scroll', () => {
-  document.getElementById('line-numbers').scrollTop = editor.scrollTop;
-});
-function updateLineNumbers() {
-  const lines = editor.value.split('\n').length;
-  let html = '';
-  for (let i=1; i<=lines; i++) html += '<span>'+i+'</span>';
-  document.getElementById('line-numbers').innerHTML = html;
+editor.addEventListener('scroll',()=>{document.getElementById('line-numbers').scrollTop=editor.scrollTop;});
+function updateLineNumbers(){
+  const lines=editor.value.split('\n').length; let html='';
+  for(let i=1;i<=lines;i++) html+='<span>'+i+'</span>';
+  document.getElementById('line-numbers').innerHTML=html;
 }
 
-// ── Resize handle ──
-let resizing=false, resizeStartX=0, resizeStartW=0;
-document.getElementById('resize-handle').addEventListener('mousedown', e => {
-  resizing=true; resizeStartX=e.clientX;
-  resizeStartW = document.getElementById('editor-pane').offsetWidth;
-  document.body.style.cursor='col-resize'; document.body.style.userSelect='none';
+let resizing=false,resizeStartX=0,resizeStartW=0;
+document.getElementById('resize-handle').addEventListener('mousedown',e=>{
+  resizing=true;resizeStartX=e.clientX;resizeStartW=document.getElementById('editor-pane').offsetWidth;
+  document.body.style.cursor='col-resize';document.body.style.userSelect='none';
 });
-window.addEventListener('mousemove', e => {
-  if (!resizing) return;
-  const w = Math.max(240, Math.min(700, resizeStartW+(e.clientX-resizeStartX)));
-  document.getElementById('editor-pane').style.width = w+'px';
-  resizeRenderer();
-  if (currentMode==='replipaint') redrawPaint();
+window.addEventListener('mousemove',e=>{
+  if(!resizing)return;
+  const w=Math.max(240,Math.min(700,resizeStartW+(e.clientX-resizeStartX)));
+  document.getElementById('editor-pane').style.width=w+'px';
+  resizeRenderer(); if(currentMode==='replipaint')redrawPaint();
 });
-window.addEventListener('mouseup', () => { resizing=false; document.body.style.cursor=''; document.body.style.userSelect=''; });
-window.addEventListener('resize', () => { resizeRenderer(); if(currentMode==='replipaint') redrawPaint(); });
+window.addEventListener('mouseup',()=>{resizing=false;document.body.style.cursor='';document.body.style.userSelect='';});
+window.addEventListener('resize',()=>{resizeRenderer();if(currentMode==='replipaint')redrawPaint();});
 
 // ═══════════════════════════════════════════════════════════
 //  INIT
@@ -731,7 +671,7 @@ document.getElementById('axes-btn').classList.add('active');
 buildPaletteGrid('palette-grid-3d');
 buildPaletteGrid('palette-grid-2d');
 buildPaletteBar();
-editor.value = defaultCode.replicube;
+editor.value=defaultCode.replicube;
 updateLineNumbers();
 updateTokenCount();
-window.addEventListener('load', () => setTimeout(()=>runCode(), 600));
+window.addEventListener('load',()=>setTimeout(()=>runCode(),600));
