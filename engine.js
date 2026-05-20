@@ -86,23 +86,25 @@ function updateCamera() {
 }
 updateCamera();
 
-threeCanvas.addEventListener('mousedown', e => { isDragging=true; lastX=e.clientX; lastY=e.clientY; });
+const vpDiv = document.getElementById('viewport');
+vpDiv.addEventListener('mousedown', e => { isDragging=true; lastX=e.clientX; lastY=e.clientY; });
 window.addEventListener('mouseup', () => isDragging=false);
 window.addEventListener('mousemove', e => {
-  if (!isDragging || currentMode!=='replicube') return;
-  theta -= (e.clientX-lastX)*0.01;
-  phi = Math.max(-1.4, Math.min(1.4, phi+(e.clientY-lastY)*0.01));
-  lastX=e.clientX; lastY=e.clientY; updateCamera();
-});
-threeCanvas.addEventListener('mousemove', e => {
-  if (currentMode !== 'replicube') return;
-  const rect = threeCanvas.getBoundingClientRect();
+  if (currentMode!=='replicube') return;
+  const rect = vpDiv.getBoundingClientRect();
   mouseViewX = e.clientX - rect.left;
   mouseViewY = e.clientY - rect.top;
-  if (!isDragging) pickVoxel(mouseViewX, mouseViewY, rect.width, rect.height);
+  if (isDragging) {
+    theta -= (e.clientX-lastX)*0.01;
+    phi = Math.max(-1.4, Math.min(1.4, phi+(e.clientY-lastY)*0.01));
+    lastX=e.clientX; lastY=e.clientY; updateCamera();
+    hoverVoxel = null;
+  } else {
+    pickVoxel(mouseViewX, mouseViewY, rect.width, rect.height);
+  }
 });
-threeCanvas.addEventListener('mouseleave', () => { hoverVoxel = null; });
-threeCanvas.addEventListener('wheel', e => {
+vpDiv.addEventListener('mouseleave', () => { hoverVoxel = null; });
+vpDiv.addEventListener('wheel', e => {
   radius = Math.max(5, Math.min(120, radius+e.deltaY*0.05));
   updateCamera(); e.preventDefault();
 }, {passive:false});
