@@ -212,14 +212,6 @@ function drawAnnotations() {
   });
 }
 
-(function animate() {
-  requestAnimationFrame(animate);
-  if (currentMode === 'replicube') {
-    renderer.render(scene, camera);
-    drawAnnotations();
-  }
-})();
-
 // ── Voxel meshes (with clip) ──
 const matCache = {};
 function getMat(r,g,b) {
@@ -261,6 +253,14 @@ function clearAll() {
   if (currentMode==='replicube') { voxelMap={}; rebuildMeshes(); logMsg('// cleared','log-info'); }
   else { paintPixels={}; bgPaletteIdx=0; redrawPaint(); logMsg('// canvas cleared','log-info'); }
 }
+
+(function animate() {
+  requestAnimationFrame(animate);
+  if (currentMode === 'replicube') {
+    renderer.render(scene, camera);
+    drawAnnotations();
+  }
+})();
 
 // ═══════════════════════════════════════════════════════════
 //  REPLIPAINT
