@@ -61,152 +61,123 @@ function buildAxes() {
 }
 buildAxes();
 
-// ── Bounding box (geometry only) + colored face planes ──
+// ── Bounding box (geometry only) ──
 let boundingBox = null;
-let facePlanes = [];
 function buildBoundingBox() {
   if (boundingBox) { scene.remove(boundingBox); boundingBox.geometry.dispose(); }
-  facePlanes.forEach(m => { scene.remove(m); m.geometry.dispose(); });
-  facePlanes = [];
-
   const s = gridSize * 2 + 1;
   boundingBox = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(s, s, s)),
     new THREE.LineBasicMaterial({ color: 0x1c2a3a })
   );
   scene.add(boundingBox);
-
-  // Colored translucent face planes (one per axis pair)
-  const g = gridSize;
-  const faceData = [
-    { axis:'x', pos: new THREE.Vector3( g+0.02, 0, 0), rot:[0,Math.PI/2,0], color:0xff2244 },
-    { axis:'x', pos: new THREE.Vector3(-g-0.02, 0, 0), rot:[0,-Math.PI/2,0], color:0xff2244 },
-    { axis:'y', pos: new THREE.Vector3(0, g+0.02, 0),  rot:[-Math.PI/2,0,0], color:0x39ff14 },
-    { axis:'y', pos: new THREE.Vector3(0,-g-0.02, 0),  rot:[Math.PI/2,0,0],  color:0x39ff14 },
-    { axis:'z', pos: new THREE.Vector3(0, 0, g+0.02),  rot:[0,0,0],          color:0x4499ff },
-    { axis:'z', pos: new THREE.Vector3(0, 0,-g-0.02),  rot:[0,Math.PI,0],    color:0x4499ff },
-  ];
-  faceData.forEach(({pos,rot,color}) => {
-    const geo = new THREE.PlaneGeometry(s, s);
-    const mat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.04, side:THREE.FrontSide, depthWrite:false });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(pos);
-    mesh.rotation.set(...rot);
-    scene.add(mesh); facePlanes.push(mesh);
-  });
 }
 buildBoundingBox();
 
 // ── 2D annotation overlay ──
 const annoCanvas = document.getElementById('anno-canvas');
 const annoCtx = annoCanvas.getContext('2d');
+let _annoW = 0, _annoH = 0;
+
+function syncAnnoSize() {
+  const w = threeCanvas.clientWidth, h = threeCanvas.clientHeight;
+  if (_annoW !== w || _annoH !== h) {
+    annoCanvas.width = w; annoCanvas.height = h;
+    _annoW = w; _annoH = h;
+  }
+}
 
 function projectToScreen(v3) {
+  // camera.matrixWorldInverse and projectionMatrix must be up to date
   const v = v3.clone().project(camera);
   return {
-    x: (v.x * 0.5 + 0.5) * annoCanvas.width,
-    y: (-v.y * 0.5 + 0.5) * annoCanvas.height,
-    z: v.z
+    x: ( v.x * 0.5 + 0.5) * _annoW,
+    y: (-v.y * 0.5 + 0.5) * _annoH,
+    behind: v.z > 1
   };
 }
 
 function drawAnnotations() {
-  annoCanvas.width  = threeCanvas.clientWidth;
-  annoCanvas.height = threeCanvas.clientHeight;
-  annoCtx.clearRect(0, 0, annoCanvas.width, annoCanvas.height);
+  syncAnnoSize();
+  annoCtx.clearRect(0, 0, _annoW, _annoH);
   if (currentMode !== 'replicube') return;
 
-  const g = gridSize;
-  const camDir = camera.position.clone().normalize();
+  // ensure camera matrices are current
+  camera.updateMatrixWorld();
 
-  // The 8 corners of the bounding box
-  // Pick the best edge for each axis by choosing the corner furthest from camera in that axis' perpendicular plane
-  // X axis: edges run along X. Pick the Y,Z corner most "facing" the camera.
-  //   4 candidate edges: (y=±g, z=±g). Pick the one whose outward normal most faces camera.
+  const g = gridSize;
+  const cp = camera.position;
+
+  // For each axis, find the outermost parallel edge (most facing camera)
   function bestEdge(axis) {
-    // returns {a, b} start/end of the edge in 3D, plus color and tick values
-    const perp1 = axis === 'x' ? 'y' : axis === 'y' ? 'x' : 'x';
-    const perp2 = axis === 'x' ? 'z' : axis === 'y' ? 'z' : 'y';
     const signs = [[-1,-1],[-1,1],[1,-1],[1,1]];
     let bestScore = -Infinity, bestS1 = 1, bestS2 = 1;
     signs.forEach(([s1,s2]) => {
-      // outward normal for this edge = (0, s1, s2) normalized (for axis=x)
-      let nx=0,ny=0,nz=0;
+      let nx=0, ny=0, nz=0;
       if(axis==='x'){ ny=s1; nz=s2; }
       else if(axis==='y'){ nx=s1; nz=s2; }
       else { nx=s1; ny=s2; }
-      const score = nx*camDir.x + ny*camDir.y + nz*camDir.z;
+      // score = how much this face normal points toward camera
+      const score = nx*cp.x + ny*cp.y + nz*cp.z;
       if(score > bestScore){ bestScore=score; bestS1=s1; bestS2=s2; }
     });
-    // Build the two endpoints of the best edge
     function pt(t) {
-      if(axis==='x') return new THREE.Vector3(t, bestS1*g, bestS2*g);
-      if(axis==='y') return new THREE.Vector3(bestS1*g, t, bestS2*g);
-      return new THREE.Vector3(bestS1*g, bestS2*g, t);
+      if(axis==='x') return new THREE.Vector3(t,        bestS1*g, bestS2*g);
+      if(axis==='y') return new THREE.Vector3(bestS1*g, t,        bestS2*g);
+      return               new THREE.Vector3(bestS1*g, bestS2*g, t);
     }
-    const colors = { x:'#ff4466', y:'#39ff14', z:'#4499ff' };
+    const colors = { x:'#ff4466', y:'#44ff88', z:'#55aaff' };
     const ticks = [];
     for(let i=-g; i<=g; i++) ticks.push(i);
-    return { start: pt(-g), end: pt(g), ticks, tickFn: t => pt(t), color: colors[axis], axis };
+    return { pt, ticks, color: colors[axis] };
   }
+
+  const ctx = annoCtx;
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
 
   ['x','y','z'].forEach(axis => {
     const edge = bestEdge(axis);
-    const pStart = projectToScreen(edge.start);
-    const pEnd   = projectToScreen(edge.end);
-    if(pStart.z > 1 || pEnd.z > 1) return; // behind camera
+    const g = gridSize;
+
+    const pStart = projectToScreen(edge.pt(-g));
+    const pEnd   = projectToScreen(edge.pt( g));
+    if(pStart.behind && pEnd.behind) return;
 
     const color = edge.color;
-    const ctx = annoCtx;
-
-    // Draw the annotation line slightly outside the box
-    ctx.beginPath();
-    ctx.moveTo(pStart.x, pStart.y);
-    ctx.lineTo(pEnd.x, pEnd.y);
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // Direction vector of the edge on screen
     const dx = pEnd.x - pStart.x;
     const dy = pEnd.y - pStart.y;
     const len = Math.sqrt(dx*dx + dy*dy);
-    if(len < 10) return;
+    if(len < 8) return;
 
-    // Perpendicular (outward from center of screen)
-    const cx = annoCanvas.width/2, cy = annoCanvas.height/2;
+    // Perpendicular direction, flipped to point away from screen center
+    const scx = _annoW/2, scy = _annoH/2;
     const midX = (pStart.x+pEnd.x)/2, midY = (pStart.y+pEnd.y)/2;
-    let px = -dy/len, py = dx/len; // one perpendicular
-    // flip so it points away from screen center
-    if((midX-cx)*px + (midY-cy)*py < 0){ px=-px; py=-py; }
+    let px = -dy/len, py = dx/len;
+    if((midX-scx)*px + (midY-scy)*py < 0){ px=-px; py=-py; }
 
-    const tickLen = 5;
-    const labelOff = 14;
-
-    ctx.font = '10px Share Tech Mono, monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    const OFF = 18; // pixels outward from edge for labels
 
     edge.ticks.forEach(v => {
-      const tp = projectToScreen(edge.tickFn(v));
-      if(tp.z > 1) return;
-      // tick mark
+      const tp = projectToScreen(edge.pt(v));
+      if(tp.behind) return;
+
+      // tick
       ctx.beginPath();
-      ctx.moveTo(tp.x + px*2, tp.y + py*2);
-      ctx.lineTo(tp.x + px*(tickLen+2), tp.y + py*(tickLen+2));
+      ctx.moveTo(tp.x + px*3,   tp.y + py*3);
+      ctx.lineTo(tp.x + px*9,   tp.y + py*9);
       ctx.strokeStyle = color;
-      ctx.globalAlpha = v===0 ? 0.9 : 0.55;
-      ctx.lineWidth = v===0 ? 1.5 : 1;
+      ctx.globalAlpha = v===0 ? 1 : 0.6;
+      ctx.lineWidth   = v===0 ? 2 : 1;
       ctx.stroke();
-      ctx.globalAlpha = 1;
+
       // label
-      ctx.fillStyle = color;
+      ctx.fillStyle   = color;
       ctx.globalAlpha = v===0 ? 1 : 0.75;
-      ctx.fillText(String(v), tp.x + px*labelOff, tp.y + py*labelOff);
-      ctx.globalAlpha = 1;
+      ctx.fillText(String(v), tp.x + px*OFF, tp.y + py*OFF);
     });
+    ctx.globalAlpha = 1;
   });
 }
 
