@@ -7,6 +7,8 @@ let paintPixels  = {};
 let bgPaletteIdx = 0;
 let showGrid = true, showAxes = true;
 let gridSize = 6;
+// clip planes: voxels with coord > clipX/Y/Z are hidden
+let clipX = 6, clipY = 6, clipZ = 6;
 
 // ═══════════════════════════════════════════════════════════
 //  THREE.JS
@@ -27,6 +29,7 @@ dl2.position.set(-10, -10, -10); scene.add(dl2);
 const voxGeo     = new THREE.BoxGeometry(0.95, 0.95, 0.95);
 const voxelGroup = new THREE.Group(); scene.add(voxelGroup);
 
+// ── Grid ──
 let gridHelper = null;
 function buildGrid() {
   if (gridHelper) scene.remove(gridHelper);
@@ -38,24 +41,70 @@ function buildGrid() {
 }
 buildGrid();
 
-let axesHelper = null;
+// ── Custom axes (so we can control length via clip sliders) ──
+let axesGroup = null;
 function buildAxes() {
-  if (axesHelper) scene.remove(axesHelper);
+  if (axesGroup) scene.remove(axesGroup);
   if (!showAxes) return;
-  axesHelper = new THREE.AxesHelper(gridSize + 1);
-  scene.add(axesHelper);
+  axesGroup = new THREE.Group();
+  const mk = (color, dir) => {
+    const mat = new THREE.LineBasicMaterial({ color });
+    const geo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0,0,0), dir
+    ]);
+    return new THREE.Line(geo, mat);
+  };
+  axesGroup.add(mk(0xff2244, new THREE.Vector3(clipX, 0, 0)));   // X rojo
+  axesGroup.add(mk(0x39ff14, new THREE.Vector3(0, clipY, 0)));   // Y verde
+  axesGroup.add(mk(0x4499ff, new THREE.Vector3(0, 0, clipZ)));   // Z azul
+  scene.add(axesGroup);
 }
 buildAxes();
 
+// ── Bounding box + dimension labels ──
 let boundingBox = null;
+let labelSprites = [];
 function buildBoundingBox() {
   if (boundingBox) scene.remove(boundingBox);
+  labelSprites.forEach(s => scene.remove(s));
+  labelSprites = [];
+
   const s = gridSize * 2 + 1;
   boundingBox = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(s, s, s)),
     new THREE.LineBasicMaterial({ color: 0x1c2a3a })
   );
   scene.add(boundingBox);
+
+  // Canvas-based sprite labels at each axis end
+  function makeLabel(text) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.fillRect(0,0,64,32);
+    ctx.font = 'bold 18px monospace';
+    ctx.fillStyle = '#3a5570';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 32, 16);
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(1.4, 0.7, 1);
+    return sprite;
+  }
+
+  const g = gridSize;
+  // ±X
+  const sx1 = makeLabel('+'+g); sx1.position.set(g+1.2, -g-0.5, -g); scene.add(sx1); labelSprites.push(sx1);
+  const sx2 = makeLabel('-'+g); sx2.position.set(-g-1.2, -g-0.5, -g); scene.add(sx2); labelSprites.push(sx2);
+  // ±Y
+  const sy1 = makeLabel('+'+g); sy1.position.set(-g-1.2, g, -g); scene.add(sy1); labelSprites.push(sy1);
+  const sy2 = makeLabel('-'+g); sy2.position.set(-g-1.2, -g, -g); scene.add(sy2); labelSprites.push(sy2);
+  // ±Z
+  const sz1 = makeLabel('+'+g); sz1.position.set(-g-1.2, -g-0.5, g); scene.add(sz1); labelSprites.push(sz1);
+  const sz2 = makeLabel('-'+g); sz2.position.set(-g-1.2, -g-0.5, -g-1); scene.add(sz2); labelSprites.push(sz2);
 }
 buildBoundingBox();
 
@@ -102,7 +151,7 @@ new ResizeObserver(resizeRenderer).observe(document.getElementById('viewport'));
 resizeRenderer();
 (function animate(){ requestAnimationFrame(animate); if(currentMode==='replicube') renderer.render(scene,camera); })();
 
-// ── Voxel meshes ──
+// ── Voxel meshes (with clip) ──
 const matCache = {};
 function getMat(r,g,b) {
   const k=Math.round(r*20)+','+Math.round(g*20)+','+Math.round(b*20);
@@ -112,12 +161,17 @@ function getMat(r,g,b) {
 function rebuildMeshes() {
   while(voxelGroup.children.length){ voxelGroup.children[0].geometry.dispose(); voxelGroup.remove(voxelGroup.children[0]); }
   const entries = Object.entries(voxelMap);
-  document.getElementById('voxel-count').textContent = entries.length;
+  // apply clip: only show voxels within clip bounds
+  const visible = entries.filter(([key]) => {
+    const [x,y,z] = key.split(',').map(Number);
+    return x <= clipX && y <= clipY && z <= clipZ;
+  });
+  document.getElementById('voxel-count').textContent = entries.length + (visible.length < entries.length ? ' ('+visible.length+' vis.)' : '');
   const byColor = {};
-  for(const [key,rgb] of entries){
-    const [x,y,z]=key.split(',').map(Number);
+  for(const [key,rgb] of visible){
     const ck=Math.round(rgb[0]*20)+','+Math.round(rgb[1]*20)+','+Math.round(rgb[2]*20);
     if(!byColor[ck]) byColor[ck]={rgb,positions:[]};
+    const [x,y,z]=key.split(',').map(Number);
     byColor[ck].positions.push([x,y,z]);
   }
   const dummy = new THREE.Object3D();
@@ -231,7 +285,7 @@ function runCode(){
 
 // ── REPLICUBE ──
 function runReplicube(userCode){
-  const stagingMap={}; // build here, only commit on success
+  const stagingMap={};
   const logs=[]; const MAX=15000; let n=0;
   const gs = gridSize;
 
@@ -369,12 +423,35 @@ function resetCamera(){
 function toggleGrid(){ showGrid=!showGrid; buildGrid(); document.getElementById('grid-btn').classList.toggle('active',showGrid); }
 function toggleAxes(){ showAxes=!showAxes; buildAxes(); document.getElementById('axes-btn').classList.toggle('active',showAxes); }
 function toggleDocs(){ document.getElementById('docs-panel').classList.toggle('open'); }
+
 function onSizeSlider(val){
   gridSize = parseInt(val);
   document.getElementById('size-val').textContent = gridSize;
+  // reset clips to full range
+  clipX = clipY = clipZ = gridSize;
+  ['x','y','z'].forEach(ax => {
+    const sl = document.getElementById('clip-'+ax);
+    if(sl){ sl.min = -gridSize; sl.max = gridSize; sl.value = gridSize; }
+    const lb = document.getElementById('clip-'+ax+'-val');
+    if(lb) lb.textContent = gridSize;
+  });
+  // clear drawing — user should re-run after choosing size
+  voxelMap = {}; rebuildMeshes();
   buildGrid(); buildAxes(); buildBoundingBox();
   resetCamera();
+  logMsg('// tamaño cambiado a ±'+gridSize+' — vuelve a ejecutar el código','log-info');
 }
+
+function onClipSlider(axis, val){
+  const v = parseInt(val);
+  document.getElementById('clip-'+axis+'-val').textContent = v;
+  if(axis==='x') clipX=v;
+  else if(axis==='y') clipY=v;
+  else clipZ=v;
+  buildAxes();       // resize axis arrows
+  rebuildMeshes();   // reapply clip
+}
+
 function updateTokenCount(){
   const code=document.getElementById('code-editor').value;
   document.getElementById('token-count').textContent='tokens: '+(code.trim()===''?0:code.trim().split(/\s+/).length);
@@ -394,14 +471,14 @@ const defaultCode = {
 
 if abs(z) < 3 and abs(y) < 3 then
   if abs(z) < 2 and x % 2 == 0 and abs(x) < 3 and y == 2 then
-    return 1
+    return WHITE
   end
-  return 15
+  return BROWN
 end`,
   replipaint:
 `-- El código recibe x, y → devuelve color (1-16)
 
-fill(3)
+fill(BLACK)
 local d = sqrt(x*x + y*y)
 return (floor(d / 6) % 16) + 1`
 };
@@ -423,6 +500,7 @@ function switchMode(mode){
   document.getElementById('axes-btn').style.display=is3D?'':'none';
   document.getElementById('size-label').style.display=is3D?'':'none';
   document.getElementById('size-slider').style.display=is3D?'':'none';
+  document.getElementById('clip-controls').style.display=is3D?'flex':'none';
   document.getElementById('docs-replicube').style.display=is3D?'block':'none';
   document.getElementById('docs-replipaint').style.display=is3D?'none':'block';
   const ed=document.getElementById('code-editor');

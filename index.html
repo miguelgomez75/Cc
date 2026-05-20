@@ -45,6 +45,14 @@
       <button class="vbtn" id="axes-btn" onclick="toggleAxes()">⊕ AXES</button>
       <label id="size-label">SIZE&nbsp;<span id="size-val">6</span></label>
       <input id="size-slider" type="range" min="1" max="10" value="6" step="1" oninput="onSizeSlider(this.value)">
+      <div id="clip-controls">
+        <span class="clip-lbl" style="color:#ff2244">X≤<span id="clip-x-val">6</span></span>
+        <input class="clip-sl" id="clip-x" type="range" min="-6" max="6" value="6" step="1" oninput="onClipSlider('x',this.value)">
+        <span class="clip-lbl" style="color:#39ff14">Y≤<span id="clip-y-val">6</span></span>
+        <input class="clip-sl" id="clip-y" type="range" min="-6" max="6" value="6" step="1" oninput="onClipSlider('y',this.value)">
+        <span class="clip-lbl" style="color:#4499ff">Z≤<span id="clip-z-val">6</span></span>
+        <input class="clip-sl" id="clip-z" type="range" min="-6" max="6" value="6" step="1" oninput="onClipSlider('z',this.value)">
+      </div>
     </div>
     <div id="viewport">
       <canvas id="three-canvas"></canvas>
