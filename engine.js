@@ -73,6 +73,8 @@ buildBoundingBox();
 
 // ── Camera orbit ──
 let isDragging = false, lastX = 0, lastY = 0;
+let hoverVoxel = null;
+let mouseViewX = 0, mouseViewY = 0;
 let theta = 0.7, phi = 0.6, radius = gridSize * 4 + 4;
 function updateCamera() {
   camera.position.set(
@@ -92,6 +94,14 @@ window.addEventListener('mousemove', e => {
   phi = Math.max(-1.4, Math.min(1.4, phi+(e.clientY-lastY)*0.01));
   lastX=e.clientX; lastY=e.clientY; updateCamera();
 });
+threeCanvas.addEventListener('mousemove', e => {
+  if (currentMode !== 'replicube') return;
+  const rect = threeCanvas.getBoundingClientRect();
+  mouseViewX = e.clientX - rect.left;
+  mouseViewY = e.clientY - rect.top;
+  if (!isDragging) pickVoxel(mouseViewX, mouseViewY, rect.width, rect.height);
+});
+threeCanvas.addEventListener('mouseleave', () => { hoverVoxel = null; });
 threeCanvas.addEventListener('wheel', e => {
   radius = Math.max(5, Math.min(120, radius+e.deltaY*0.05));
   updateCamera(); e.preventDefault();
@@ -210,6 +220,71 @@ function drawAnnotations() {
     }
     ctx.globalAlpha = 1;
   });
+
+  // ── Hover tooltip ──
+  if (hoverVoxel) {
+    const { x, y, z, rgb, colorIdx, colorName } = hoverVoxel;
+    const r8 = Math.round(rgb[0]*255), g8 = Math.round(rgb[1]*255), b8 = Math.round(rgb[2]*255);
+    const hex = '#'+r8.toString(16).padStart(2,'0')+g8.toString(16).padStart(2,'0')+b8.toString(16).padStart(2,'0');
+    const lines = ['x:'+x+'  y:'+y+'  z:'+z, colorIdx+' '+colorName, hex];
+    ctx.font = 'bold 11px monospace';
+    const maxW = Math.max(...lines.map(l => ctx.measureText(l).width));
+    const padX=10, padY=7, lineH=16, swW=10;
+    const bw = maxW + padX*2 + swW + 6;
+    const bh = lines.length*lineH + padY*2;
+    let bx = mouseViewX+14, by = mouseViewY - bh - 6;
+    if (bx+bw > W-4) bx = W-bw-4;
+    if (by < 4) by = mouseViewY+14;
+    // bg
+    ctx.globalAlpha = 0.93;
+    ctx.fillStyle = '#080c12';
+    roundRect(ctx, bx, by, bw, bh, 5); ctx.fill();
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = '#2a3f55'; ctx.lineWidth = 1;
+    roundRect(ctx, bx, by, bw, bh, 5); ctx.stroke();
+    // swatch (only on color line)
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgb('+r8+','+g8+','+b8+')';
+    roundRect(ctx, bx+padX, by+padY+lineH+3, swW, swW, 2); ctx.fill();
+    // text
+    ctx.fillStyle = '#c8dde8'; ctx.globalAlpha = 1;
+    ctx.fillText(lines[0], bx+padX, by+padY+lineH*0.6);
+    ctx.fillText(lines[1], bx+padX+swW+5, by+padY+lineH*1.6);
+    ctx.fillStyle = '#7090a0';
+    ctx.fillText(lines[2], bx+padX+swW+5, by+padY+lineH*2.6);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ── Voxel picking ──
+const _raycaster = new THREE.Raycaster();
+function pickVoxel(mx, my, W, H) {
+  _raycaster.setFromCamera(new THREE.Vector2((mx/W)*2-1, -(my/H)*2+1), camera);
+  const hits = _raycaster.intersectObjects(voxelGroup.children, false);
+  if (!hits.length) { hoverVoxel = null; return; }
+  const pt = hits[0].point.clone().addScaledVector(_raycaster.ray.direction, 0.1);
+  const x = Math.round(pt.x), y = Math.round(pt.y), z = Math.round(pt.z);
+  const rgb = voxelMap[x+','+y+','+z];
+  if (!rgb) { hoverVoxel = null; return; }
+  const NAMES = ['','WHITE','GREY','BLACK','PEACH','PINK','PURPLE','RED',
+    'ORANGE','YELLOW','LIGHTGREEN','GREEN','DARKBLUE','BLUE','LIGHTBLUE','BROWN','DARKBROWN'];
+  let colorIdx = 0, colorName = '?';
+  for (let i=1; i<=16; i++) {
+    const p = paletteRGB(i);
+    if (p && Math.abs(p[0]-rgb[0])<0.02 && Math.abs(p[1]-rgb[1])<0.02 && Math.abs(p[2]-rgb[2])<0.02) {
+      colorIdx = i; colorName = NAMES[i]; break;
+    }
+  }
+  hoverVoxel = { x, y, z, rgb, colorIdx, colorName };
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
 }
 
 // ── Voxel meshes (with clip) ──
