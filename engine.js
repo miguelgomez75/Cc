@@ -224,58 +224,70 @@ function drawAnnotations() {
   // ── Hover tooltip ──
   if (hoverVoxel) {
     const { x, y, z, rgb, colorIdx, colorName } = hoverVoxel;
-    const r8 = Math.round(rgb[0]*255), g8 = Math.round(rgb[1]*255), b8 = Math.round(rgb[2]*255);
-    const hex = '#'+r8.toString(16).padStart(2,'0')+g8.toString(16).padStart(2,'0')+b8.toString(16).padStart(2,'0');
-    const lines = ['x:'+x+'  y:'+y+'  z:'+z, colorIdx+' '+colorName, hex];
+    const sw = 10; // swatch size
+    const coordLine = 'x:'+x+'  y:'+y+'  z:'+z;
+    const colorLine = colorIdx+'  '+colorName;
     ctx.font = 'bold 11px monospace';
-    const maxW = Math.max(...lines.map(l => ctx.measureText(l).width));
-    const padX=10, padY=7, lineH=16, swW=10;
-    const bw = maxW + padX*2 + swW + 6;
-    const bh = lines.length*lineH + padY*2;
-    let bx = mouseViewX+14, by = mouseViewY - bh - 6;
-    if (bx+bw > W-4) bx = W-bw-4;
-    if (by < 4) by = mouseViewY+14;
-    // bg
+    const lineW = Math.max(ctx.measureText(coordLine).width, ctx.measureText(colorLine).width + sw + 6);
+    const padX=10, padY=8, lineH=17;
+    const bw = lineW + padX*2;
+    const bh = lineH*2 + padY*2;
+    let bx = mouseViewX+16, by = mouseViewY - bh - 8;
+    if (bx+bw > W-4) bx = mouseViewX - bw - 8;
+    if (by < 4) by = mouseViewY+12;
+    // background
     ctx.globalAlpha = 0.93;
     ctx.fillStyle = '#080c12';
     roundRect(ctx, bx, by, bw, bh, 5); ctx.fill();
-    ctx.globalAlpha = 0.6;
-    ctx.strokeStyle = '#2a3f55'; ctx.lineWidth = 1;
+    // border (colored with axis-like accent)
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 1;
     roundRect(ctx, bx, by, bw, bh, 5); ctx.stroke();
-    // swatch (only on color line)
+    // coord line
     ctx.globalAlpha = 1;
+    ctx.fillStyle = '#b8ccd8';
+    ctx.fillText(coordLine, bx+padX, by+padY+lineH*0.55);
+    // color swatch
+    const r8=Math.round(rgb[0]*255), g8=Math.round(rgb[1]*255), b8=Math.round(rgb[2]*255);
     ctx.fillStyle = 'rgb('+r8+','+g8+','+b8+')';
-    roundRect(ctx, bx+padX, by+padY+lineH+3, swW, swW, 2); ctx.fill();
-    // text
-    ctx.fillStyle = '#c8dde8'; ctx.globalAlpha = 1;
-    ctx.fillText(lines[0], bx+padX, by+padY+lineH*0.6);
-    ctx.fillText(lines[1], bx+padX+swW+5, by+padY+lineH*1.6);
-    ctx.fillStyle = '#7090a0';
-    ctx.fillText(lines[2], bx+padX+swW+5, by+padY+lineH*2.6);
+    roundRect(ctx, bx+padX, by+padY+lineH+4, sw, sw, 2); ctx.fill();
+    // color label
+    ctx.fillStyle = '#b8ccd8';
+    ctx.fillText(colorLine, bx+padX+sw+5, by+padY+lineH*1.6);
     ctx.globalAlpha = 1;
   }
 }
 
 // ── Voxel picking ──
+// instanceMap: maps InstancedMesh → array of {key, colorIdx}
+// so we can look up exact voxel from instanceId
 const _raycaster = new THREE.Raycaster();
+let _instanceMap = new Map(); // mesh → [{key, colorIdx}]
+
+const PALETTE_NAMES = ['','WHITE','GREY','BLACK','PEACH','PINK','PURPLE','RED',
+  'ORANGE','YELLOW','LIGHTGREEN','GREEN','DARKBLUE','BLUE','LIGHTBLUE','BROWN','DARKBROWN'];
+
 function pickVoxel(mx, my, W, H) {
   _raycaster.setFromCamera(new THREE.Vector2((mx/W)*2-1, -(my/H)*2+1), camera);
   const hits = _raycaster.intersectObjects(voxelGroup.children, false);
   if (!hits.length) { hoverVoxel = null; return; }
-  const pt = hits[0].point.clone().addScaledVector(_raycaster.ray.direction, 0.1);
-  const x = Math.round(pt.x), y = Math.round(pt.y), z = Math.round(pt.z);
-  const rgb = voxelMap[x+','+y+','+z];
+
+  const hit = hits[0];
+  const mesh = hit.object;
+  const list = _instanceMap.get(mesh);
+  if (!list) { hoverVoxel = null; return; }
+
+  const entry = list[hit.instanceId];
+  if (!entry) { hoverVoxel = null; return; }
+
+  const [x,y,z] = entry.key.split(',').map(Number);
+  const rgb = voxelMap[entry.key];
   if (!rgb) { hoverVoxel = null; return; }
-  const NAMES = ['','WHITE','GREY','BLACK','PEACH','PINK','PURPLE','RED',
-    'ORANGE','YELLOW','LIGHTGREEN','GREEN','DARKBLUE','BLUE','LIGHTBLUE','BROWN','DARKBROWN'];
-  let colorIdx = 0, colorName = '?';
-  for (let i=1; i<=16; i++) {
-    const p = paletteRGB(i);
-    if (p && Math.abs(p[0]-rgb[0])<0.02 && Math.abs(p[1]-rgb[1])<0.02 && Math.abs(p[2]-rgb[2])<0.02) {
-      colorIdx = i; colorName = NAMES[i]; break;
-    }
-  }
-  hoverVoxel = { x, y, z, rgb, colorIdx, colorName };
+
+  hoverVoxel = { x, y, z, rgb,
+    colorIdx: entry.colorIdx,
+    colorName: PALETTE_NAMES[entry.colorIdx] || '?'
+  };
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -299,6 +311,9 @@ function rebuildMeshes() {
     voxelGroup.children[0].geometry.dispose();
     voxelGroup.remove(voxelGroup.children[0]);
   }
+  _instanceMap = new Map();
+  hoverVoxel = null;
+
   const entries = Object.entries(voxelMap);
   const visible = entries.filter(([key]) => {
     const [x,y,z] = key.split(',').map(Number);
@@ -307,20 +322,31 @@ function rebuildMeshes() {
   document.getElementById('voxel-count').textContent =
     entries.length + (visible.length < entries.length ? ' ('+visible.length+' vis.)' : '');
 
+  // Group by colorIdx (not just rgb float key) so instanceId maps cleanly
   const byColor = {};
-  for (const [key,rgb] of visible) {
-    const ck = Math.round(rgb[0]*20)+','+Math.round(rgb[1]*20)+','+Math.round(rgb[2]*20);
-    if (!byColor[ck]) byColor[ck] = { rgb, positions:[] };
-    byColor[ck].positions.push(key.split(',').map(Number));
+  for (const [key, rgb] of visible) {
+    // find colorIdx
+    let colorIdx = 0;
+    for (let i=1; i<=16; i++) {
+      const p = paletteRGB(i);
+      if (p && Math.abs(p[0]-rgb[0])<0.02 && Math.abs(p[1]-rgb[1])<0.02 && Math.abs(p[2]-rgb[2])<0.02) {
+        colorIdx = i; break;
+      }
+    }
+    if (!byColor[colorIdx]) byColor[colorIdx] = { rgb, entries:[] };
+    byColor[colorIdx].entries.push({ key, colorIdx });
   }
+
   const dummy = new THREE.Object3D();
-  for (const {rgb, positions} of Object.values(byColor)) {
-    const mesh = new THREE.InstancedMesh(voxGeo, getMat(...rgb), positions.length);
-    positions.forEach((pos,i) => {
-      dummy.position.set(...pos); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
+  for (const { rgb, entries: colorEntries } of Object.values(byColor)) {
+    const mesh = new THREE.InstancedMesh(voxGeo, getMat(...rgb), colorEntries.length);
+    colorEntries.forEach(({ key }, i) => {
+      const [x,y,z] = key.split(',').map(Number);
+      dummy.position.set(x,y,z); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
     voxelGroup.add(mesh);
+    _instanceMap.set(mesh, colorEntries);
   }
 }
 
