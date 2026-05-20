@@ -61,13 +61,13 @@ function buildAxes() {
 }
 buildAxes();
 
-// ── Bounding box + dimension labels ──
+// ── Bounding box (geometry only) + colored face planes ──
 let boundingBox = null;
-let labelSprites = [];
+let facePlanes = [];
 function buildBoundingBox() {
-  if (boundingBox) scene.remove(boundingBox);
-  labelSprites.forEach(s => scene.remove(s));
-  labelSprites = [];
+  if (boundingBox) { scene.remove(boundingBox); boundingBox.geometry.dispose(); }
+  facePlanes.forEach(m => { scene.remove(m); m.geometry.dispose(); });
+  facePlanes = [];
 
   const s = gridSize * 2 + 1;
   boundingBox = new THREE.LineSegments(
@@ -76,37 +76,139 @@ function buildBoundingBox() {
   );
   scene.add(boundingBox);
 
-  // Canvas-based sprite labels at each axis end
-  function makeLabel(text) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64; canvas.height = 32;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(0,0,0,0)';
-    ctx.fillRect(0,0,64,32);
-    ctx.font = 'bold 18px monospace';
-    ctx.fillStyle = '#3a5570';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 32, 16);
-    const tex = new THREE.CanvasTexture(canvas);
-    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-    const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(1.4, 0.7, 1);
-    return sprite;
-  }
-
+  // Colored translucent face planes (one per axis pair)
   const g = gridSize;
-  // ±X
-  const sx1 = makeLabel('+'+g); sx1.position.set(g+1.2, -g-0.5, -g); scene.add(sx1); labelSprites.push(sx1);
-  const sx2 = makeLabel('-'+g); sx2.position.set(-g-1.2, -g-0.5, -g); scene.add(sx2); labelSprites.push(sx2);
-  // ±Y
-  const sy1 = makeLabel('+'+g); sy1.position.set(-g-1.2, g, -g); scene.add(sy1); labelSprites.push(sy1);
-  const sy2 = makeLabel('-'+g); sy2.position.set(-g-1.2, -g, -g); scene.add(sy2); labelSprites.push(sy2);
-  // ±Z
-  const sz1 = makeLabel('+'+g); sz1.position.set(-g-1.2, -g-0.5, g); scene.add(sz1); labelSprites.push(sz1);
-  const sz2 = makeLabel('-'+g); sz2.position.set(-g-1.2, -g-0.5, -g-1); scene.add(sz2); labelSprites.push(sz2);
+  const faceData = [
+    { axis:'x', pos: new THREE.Vector3( g+0.02, 0, 0), rot:[0,Math.PI/2,0], color:0xff2244 },
+    { axis:'x', pos: new THREE.Vector3(-g-0.02, 0, 0), rot:[0,-Math.PI/2,0], color:0xff2244 },
+    { axis:'y', pos: new THREE.Vector3(0, g+0.02, 0),  rot:[-Math.PI/2,0,0], color:0x39ff14 },
+    { axis:'y', pos: new THREE.Vector3(0,-g-0.02, 0),  rot:[Math.PI/2,0,0],  color:0x39ff14 },
+    { axis:'z', pos: new THREE.Vector3(0, 0, g+0.02),  rot:[0,0,0],          color:0x4499ff },
+    { axis:'z', pos: new THREE.Vector3(0, 0,-g-0.02),  rot:[0,Math.PI,0],    color:0x4499ff },
+  ];
+  faceData.forEach(({pos,rot,color}) => {
+    const geo = new THREE.PlaneGeometry(s, s);
+    const mat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.04, side:THREE.FrontSide, depthWrite:false });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos);
+    mesh.rotation.set(...rot);
+    scene.add(mesh); facePlanes.push(mesh);
+  });
 }
 buildBoundingBox();
+
+// ── 2D annotation overlay ──
+const annoCanvas = document.getElementById('anno-canvas');
+const annoCtx = annoCanvas.getContext('2d');
+
+function projectToScreen(v3) {
+  const v = v3.clone().project(camera);
+  return {
+    x: (v.x * 0.5 + 0.5) * annoCanvas.width,
+    y: (-v.y * 0.5 + 0.5) * annoCanvas.height,
+    z: v.z
+  };
+}
+
+function drawAnnotations() {
+  annoCanvas.width  = threeCanvas.clientWidth;
+  annoCanvas.height = threeCanvas.clientHeight;
+  annoCtx.clearRect(0, 0, annoCanvas.width, annoCanvas.height);
+  if (currentMode !== 'replicube') return;
+
+  const g = gridSize;
+  const camDir = camera.position.clone().normalize();
+
+  // The 8 corners of the bounding box
+  // Pick the best edge for each axis by choosing the corner furthest from camera in that axis' perpendicular plane
+  // X axis: edges run along X. Pick the Y,Z corner most "facing" the camera.
+  //   4 candidate edges: (y=±g, z=±g). Pick the one whose outward normal most faces camera.
+  function bestEdge(axis) {
+    // returns {a, b} start/end of the edge in 3D, plus color and tick values
+    const perp1 = axis === 'x' ? 'y' : axis === 'y' ? 'x' : 'x';
+    const perp2 = axis === 'x' ? 'z' : axis === 'y' ? 'z' : 'y';
+    const signs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+    let bestScore = -Infinity, bestS1 = 1, bestS2 = 1;
+    signs.forEach(([s1,s2]) => {
+      // outward normal for this edge = (0, s1, s2) normalized (for axis=x)
+      let nx=0,ny=0,nz=0;
+      if(axis==='x'){ ny=s1; nz=s2; }
+      else if(axis==='y'){ nx=s1; nz=s2; }
+      else { nx=s1; ny=s2; }
+      const score = nx*camDir.x + ny*camDir.y + nz*camDir.z;
+      if(score > bestScore){ bestScore=score; bestS1=s1; bestS2=s2; }
+    });
+    // Build the two endpoints of the best edge
+    function pt(t) {
+      if(axis==='x') return new THREE.Vector3(t, bestS1*g, bestS2*g);
+      if(axis==='y') return new THREE.Vector3(bestS1*g, t, bestS2*g);
+      return new THREE.Vector3(bestS1*g, bestS2*g, t);
+    }
+    const colors = { x:'#ff4466', y:'#39ff14', z:'#4499ff' };
+    const ticks = [];
+    for(let i=-g; i<=g; i++) ticks.push(i);
+    return { start: pt(-g), end: pt(g), ticks, tickFn: t => pt(t), color: colors[axis], axis };
+  }
+
+  ['x','y','z'].forEach(axis => {
+    const edge = bestEdge(axis);
+    const pStart = projectToScreen(edge.start);
+    const pEnd   = projectToScreen(edge.end);
+    if(pStart.z > 1 || pEnd.z > 1) return; // behind camera
+
+    const color = edge.color;
+    const ctx = annoCtx;
+
+    // Draw the annotation line slightly outside the box
+    ctx.beginPath();
+    ctx.moveTo(pStart.x, pStart.y);
+    ctx.lineTo(pEnd.x, pEnd.y);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Direction vector of the edge on screen
+    const dx = pEnd.x - pStart.x;
+    const dy = pEnd.y - pStart.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if(len < 10) return;
+
+    // Perpendicular (outward from center of screen)
+    const cx = annoCanvas.width/2, cy = annoCanvas.height/2;
+    const midX = (pStart.x+pEnd.x)/2, midY = (pStart.y+pEnd.y)/2;
+    let px = -dy/len, py = dx/len; // one perpendicular
+    // flip so it points away from screen center
+    if((midX-cx)*px + (midY-cy)*py < 0){ px=-px; py=-py; }
+
+    const tickLen = 5;
+    const labelOff = 14;
+
+    ctx.font = '10px Share Tech Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    edge.ticks.forEach(v => {
+      const tp = projectToScreen(edge.tickFn(v));
+      if(tp.z > 1) return;
+      // tick mark
+      ctx.beginPath();
+      ctx.moveTo(tp.x + px*2, tp.y + py*2);
+      ctx.lineTo(tp.x + px*(tickLen+2), tp.y + py*(tickLen+2));
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = v===0 ? 0.9 : 0.55;
+      ctx.lineWidth = v===0 ? 1.5 : 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // label
+      ctx.fillStyle = color;
+      ctx.globalAlpha = v===0 ? 1 : 0.75;
+      ctx.fillText(String(v), tp.x + px*labelOff, tp.y + py*labelOff);
+      ctx.globalAlpha = 1;
+    });
+  });
+}
 
 let isDragging = false, lastX = 0, lastY = 0;
 let theta = 0.7, phi = 0.6, radius = gridSize * 4 + 4;
@@ -149,7 +251,13 @@ function resizeRenderer() {
 }
 new ResizeObserver(resizeRenderer).observe(document.getElementById('viewport'));
 resizeRenderer();
-(function animate(){ requestAnimationFrame(animate); if(currentMode==='replicube') renderer.render(scene,camera); })();
+(function animate(){
+  requestAnimationFrame(animate);
+  if(currentMode==='replicube'){
+    renderer.render(scene,camera);
+    drawAnnotations();
+  }
+})();
 
 // ── Voxel meshes (with clip) ──
 const matCache = {};
