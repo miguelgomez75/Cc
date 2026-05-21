@@ -2,7 +2,7 @@
 -----------------------------
 
 <p align="center">
-  <img src="001%20Axis%20cube/preview.png" alt="Preview" width="500">
+  <img src="preview.png" alt="Preview" width="500">
 </p>
 
 -----------------------------
