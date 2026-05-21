@@ -152,48 +152,44 @@ updateCamera();
 // We handle everything there and pass through visually
 window.addEventListener('load', () => {
   const vp = document.getElementById('viewport');
-  const ac = document.getElementById('anno-canvas');
 
-  // Enable pointer events on anno-canvas so it receives mouse
-  ac.style.pointerEvents = 'auto';
-
-  ac.addEventListener('mousedown', e => {
-    isDragging = true; lastX = e.clientX; lastY = e.clientY;
-    hoverVoxel = null;
+  vp.addEventListener('mousedown', e => {
+    isDragging = true; lastX = e.clientX; lastY = e.clientY; hoverVoxel = null;
   });
   window.addEventListener('mouseup', () => { isDragging = false; });
-  ac.addEventListener('mouseleave', () => { hoverVoxel = null; });
-
+  vp.addEventListener('mouseleave', () => { hoverVoxel = null; });
   window.addEventListener('mousemove', e => {
     if (currentMode !== 'replicube') return;
-    const rect = ac.getBoundingClientRect();
+    const rect = vp.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
     mouseViewX = e.clientX - rect.left;
     mouseViewY = e.clientY - rect.top;
     if (isDragging) {
       theta -= (e.clientX - lastX) * 0.01;
       phi = Math.max(-1.4, Math.min(1.4, phi + (e.clientY - lastY) * 0.01));
       lastX = e.clientX; lastY = e.clientY;
-      updateCamera();
+      updateCamera(); hoverVoxel = null;
     } else {
       pickVoxel(mouseViewX, mouseViewY);
     }
   });
-
-  ac.addEventListener('wheel', e => {
+  vp.addEventListener('wheel', e => {
+    if (currentMode !== 'replicube') return;
     radius = Math.max(5, Math.min(120, radius + e.deltaY * 0.05));
     updateCamera(); e.preventDefault();
   }, { passive: false });
-
-  // touch
   let ltx = 0, lty = 0;
-  ac.addEventListener('touchstart', e => { ltx = e.touches[0].clientX; lty = e.touches[0].clientY; });
-  ac.addEventListener('touchmove', e => {
+  vp.addEventListener('touchstart', e => { ltx = e.touches[0].clientX; lty = e.touches[0].clientY; });
+  vp.addEventListener('touchmove', e => {
     if (currentMode !== 'replicube') return;
     theta -= (e.touches[0].clientX - ltx) * 0.015;
     phi = Math.max(-1.4, Math.min(1.4, phi + (e.touches[0].clientY - lty) * 0.015));
     ltx = e.touches[0].clientX; lty = e.touches[0].clientY;
     updateCamera(); e.preventDefault();
   }, { passive: false });
+
+  resizeRenderer();
+  setTimeout(() => runCode(), 300);
 });
 
 // ── Raycaster ──
@@ -674,4 +670,4 @@ buildPaletteBar();
 editor.value=defaultCode.replicube;
 updateLineNumbers();
 updateTokenCount();
-window.addEventListener('load',()=>setTimeout(()=>runCode(),600));
+// init handled above in load listener
