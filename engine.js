@@ -188,6 +188,7 @@ window.addEventListener('load', () => {
     updateCamera(); e.preventDefault();
   }, { passive: false });
 
+  new ResizeObserver(resizeRenderer).observe(document.getElementById('viewport'));
   resizeRenderer();
   setTimeout(() => runCode(), 300);
 });
@@ -220,9 +221,6 @@ function resizeRenderer() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
-new ResizeObserver(resizeRenderer).observe(document.getElementById('viewport'));
-resizeRenderer();
-
 // ── Annotation + tooltip overlay ──
 const annoCanvas = document.getElementById('anno-canvas');
 const annoCtx    = annoCanvas.getContext('2d');
