@@ -382,6 +382,27 @@ function runCode(){
     if(currentMode==='replicube') runReplicube(code);
     else runReplipaint(code);
   }catch(e){ logMsg('// runtime error: '+e.message,'log-error'); }
+  shareToURL();
+}
+
+function shareToURL() {
+  try {
+    const code = editor.value;
+    const mode = currentMode;
+    const payload = JSON.stringify({ mode, code });
+    // btoa con soporte unicode
+    const encoded = btoa(unescape(encodeURIComponent(payload)));
+    history.replaceState(null, '', '#' + encoded);
+    // Actualiza el botón de compartir si existe
+    const btn = document.getElementById('share-btn');
+    if (btn) {
+      btn.textContent = '✓ COPIED';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.textContent = '⌁ SHARE'; btn.style.color = ''; }, 1800);
+    }
+  } catch (e) {
+    // silencioso — la URL puede ser demasiado larga en casos extremos
+  }
 }
 
 function runReplicube(userCode){
@@ -554,9 +575,22 @@ document.getElementById('axes-btn').classList.add('active');
 buildPaletteGrid('palette-grid-3d');
 buildPaletteGrid('palette-grid-2d');
 buildPaletteBar();
-editor.value=defaultCode.replicube;
-updateLineNumbers();
-updateTokenCount();
+function loadFromURL() {
+  if (!location.hash || location.hash.length < 4) return false;
+  try {
+    const payload = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
+    if (payload.code) {
+      editor.value = payload.code;
+      if (payload.mode && payload.mode !== currentMode) {
+        switchMode(payload.mode);
+      }
+      return true;
+    }
+  } catch (e) {
+    // hash inválido o de otra cosa — ignorar
+  }
+  return false;
+}
 
 // Expose globals needed by HTML onclick attributes
 window.runCode    = runCode;
