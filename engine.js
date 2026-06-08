@@ -385,26 +385,6 @@ function runCode(){
   shareToURL();
 }
 
-function shareToURL() {
-  try {
-    const code = editor.value;
-    const mode = currentMode;
-    const payload = JSON.stringify({ mode, code });
-    // btoa con soporte unicode
-    const encoded = btoa(unescape(encodeURIComponent(payload)));
-    history.replaceState(null, '', '#' + encoded);
-    // Actualiza el botón de compartir si existe
-    const btn = document.getElementById('share-btn');
-    if (btn) {
-      btn.textContent = '✓ COPIED';
-      btn.style.color = 'var(--green)';
-      setTimeout(() => { btn.textContent = '⌁ SHARE'; btn.style.color = ''; }, 1800);
-    }
-  } catch (e) {
-    // silencioso — la URL puede ser demasiado larga en casos extremos
-  }
-}
-
 function runReplicube(userCode){
   const staging={}; const logs=[]; const MAX=15000; let n=0; const gs=gridSize;
   execLua(getLuaHelpers()+`
@@ -464,6 +444,49 @@ function execLua(code,fns,cb){
     if(st!==fengari.lua.LUA_OK) cb(fengari.to_jsstring(lua.lua_tostring(L,-1)).replace(/\[string.*?\]:/,'line'));
     else cb(null);
   }catch(e){cb(e.message);}
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SHARE BY URL
+// ═══════════════════════════════════════════════════════════
+function shareToURL() {
+  try {
+    const payload = JSON.stringify({ mode: currentMode, code: editor.value });
+    const encoded = btoa(unescape(encodeURIComponent(payload)));
+    history.replaceState(null, '', '#' + encoded);
+  } catch (e) {
+    // silencioso — puede fallar si el código es muy largo
+  }
+}
+
+function copyShareURL() {
+  shareToURL();
+  navigator.clipboard.writeText(location.href).then(() => {
+    const btn = document.getElementById('share-btn');
+    if (btn) {
+      const prev = btn.textContent;
+      btn.textContent = '✓ COPIED';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.textContent = prev; btn.style.color = ''; }, 1800);
+    }
+  }).catch(() => {
+    prompt('Copia esta URL:', location.href);
+  });
+}
+
+function loadFromURL() {
+  if (!location.hash || location.hash.length < 4) return false;
+  try {
+    const payload = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
+    if (payload.code) {
+      if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
+      editor.value = payload.code;
+      return true;
+    }
+  } catch (e) {
+    // hash inválido — ignorar
+  }
+  return false;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -575,34 +598,27 @@ document.getElementById('axes-btn').classList.add('active');
 buildPaletteGrid('palette-grid-3d');
 buildPaletteGrid('palette-grid-2d');
 buildPaletteBar();
-function loadFromURL() {
-  if (!location.hash || location.hash.length < 4) return false;
-  try {
-    const payload = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
-    if (payload.code) {
-      editor.value = payload.code;
-      if (payload.mode && payload.mode !== currentMode) {
-        switchMode(payload.mode);
-      }
-      return true;
-    }
-  } catch (e) {
-    // hash inválido o de otra cosa — ignorar
-  }
-  return false;
+
+if (!loadFromURL()) {
+  editor.value = defaultCode.replicube;
 }
 
+updateLineNumbers();
+updateTokenCount();
+
 // Expose globals needed by HTML onclick attributes
-window.runCode    = runCode;
-window.clearAll   = clearAll;
-window.toggleDocs = toggleDocs;
-window.exportPNG  = exportPNG;
-window.resetCamera= resetCamera;
-window.toggleGrid = toggleGrid;
-window.toggleAxes = toggleAxes;
-window.switchMode = switchMode;
+window.runCode      = runCode;
+window.clearAll     = clearAll;
+window.toggleDocs   = toggleDocs;
+window.exportPNG    = exportPNG;
+window.resetCamera  = resetCamera;
+window.toggleGrid   = toggleGrid;
+window.toggleAxes   = toggleAxes;
+window.switchMode   = switchMode;
 window.onSizeSlider = onSizeSlider;
 window.onClipSlider = onClipSlider;
+window.copyShareURL = copyShareURL;
+window.shareToURL   = shareToURL;
 
 setTimeout(()=>runCode(), 200);
 
