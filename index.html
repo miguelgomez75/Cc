@@ -3,187 +3,999 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Replicube</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>
-<link rel="stylesheet" href="style.css">
+<title>Replicube — Procedural Voxel & Pixel Editor</title>
+<meta name="description" content="A browser-based procedural voxel and 2D pixel editor powered by Lua scripting, Three.js, and WebGL. No install required.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #060810;
+  --bg2:      #0b0f1a;
+  --bg3:      #0f1520;
+  --border:   #1a2840;
+  --accent:   #00d4ff;
+  --accent2:  #ff6b35;
+  --green:    #39ff14;
+  --text:     #b8ccd8;
+  --dim:      #3a5570;
+  --mono:     'Share Tech Mono', monospace;
+  --title:    'Orbitron', sans-serif;
+  --body:     'DM Sans', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── SCANLINE ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── GRID BACKGROUND ── */
+.grid-bg {
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(6,8,16,0.85);
+  backdrop-filter: blur(12px);
+  z-index: 100;
+}
+
+.nav-logo {
+  font-family: var(--title);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  color: var(--accent);
+  text-decoration: none;
+  text-shadow: 0 0 20px rgba(0,212,255,0.4);
+}
+
+.nav-links { display: flex; gap: 28px; align-items: center; }
+
+.nav-links a {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-decoration: none;
+  transition: color .2s;
+}
+.nav-links a:hover { color: var(--accent); }
+
+.nav-cta {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent) !important;
+  border: 1px solid var(--accent);
+  padding: 6px 18px;
+  transition: background .2s, box-shadow .2s !important;
+}
+.nav-cta:hover {
+  background: rgba(0,212,255,0.1) !important;
+  box-shadow: 0 0 16px rgba(0,212,255,0.2) !important;
+}
+
+/* ── HERO ── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  padding: 120px 24px 80px;
+  z-index: 1;
+}
+
+.hero-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 24px;
+  opacity: 0;
+  animation: fadeUp .8s .2s forwards;
+}
+
+.hero-title {
+  font-family: var(--title);
+  font-size: clamp(40px, 7vw, 84px);
+  font-weight: 900;
+  letter-spacing: 4px;
+  line-height: 1.05;
+  color: #fff;
+  margin-bottom: 12px;
+  opacity: 0;
+  animation: fadeUp .8s .35s forwards;
+}
+
+.hero-title span {
+  color: var(--accent);
+  text-shadow: 0 0 40px rgba(0,212,255,0.5);
+}
+
+.hero-subtitle-mono {
+  font-family: var(--mono);
+  font-size: clamp(12px, 1.5vw, 16px);
+  color: var(--accent2);
+  letter-spacing: 2px;
+  margin-bottom: 32px;
+  opacity: 0;
+  animation: fadeUp .8s .5s forwards;
+}
+
+.hero-desc {
+  font-size: 18px;
+  font-weight: 300;
+  color: var(--text);
+  max-width: 560px;
+  margin: 0 auto 48px;
+  opacity: 0;
+  animation: fadeUp .8s .65s forwards;
+}
+
+.hero-actions {
+  display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+  opacity: 0;
+  animation: fadeUp .8s .8s forwards;
+}
+
+.btn-primary {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #000;
+  background: var(--accent);
+  border: none;
+  padding: 14px 32px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: box-shadow .2s, transform .15s;
+}
+.btn-primary:hover {
+  box-shadow: 0 0 30px rgba(0,212,255,0.5);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 14px 32px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: border-color .2s, color .2s;
+}
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── EDITOR PREVIEW FRAME ── */
+.preview-frame {
+  position: relative;
+  width: min(900px, 92vw);
+  margin: 64px auto 0;
+  opacity: 0;
+  animation: fadeUp .8s 1s forwards;
+}
+
+.preview-window {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.preview-titlebar {
+  height: 36px;
+  background: #0d1117;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+}
+
+.preview-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+
+.preview-titlebar-text {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  margin-left: 8px;
+}
+
+.preview-body {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  height: 320px;
+}
+
+.preview-editor-pane {
+  border-right: 1px solid var(--border);
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.8;
+  overflow: hidden;
+}
+
+.code-comment { color: #3a5570; }
+.code-keyword { color: #ff6b35; }
+.code-fn { color: #00d4ff; }
+.code-number { color: #ffe461; }
+.code-string { color: #39ff14; }
+
+.preview-viewport {
+  background: #090b0f;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.voxel-preview-svg { width: 80%; height: 80%; }
+
+/* ── SCROLL INDICATOR ── */
+.scroll-hint {
+  position: absolute;
+  bottom: 32px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
+  color: var(--dim);
+  animation: pulse 2s ease-in-out infinite;
+}
+.scroll-hint::after {
+  content: '';
+  width: 1px; height: 40px;
+  background: linear-gradient(var(--dim), transparent);
+  animation: growLine 2s ease-in-out infinite;
+}
+
+/* ── SECTIONS ── */
+section {
+  position: relative;
+  z-index: 1;
+  padding: 100px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: block;
+}
+
+.section-title {
+  font-family: var(--title);
+  font-size: clamp(24px, 3.5vw, 40px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+  margin-bottom: 20px;
+  line-height: 1.15;
+}
+
+.section-desc {
+  font-size: 17px;
+  font-weight: 300;
+  color: var(--text);
+  max-width: 600px;
+  margin-bottom: 56px;
+}
+
+/* ── TECH STACK ── */
+.stack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1px;
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+
+.stack-card {
+  background: var(--bg2);
+  padding: 32px 28px;
+  transition: background .2s;
+}
+.stack-card:hover { background: var(--bg3); }
+
+.stack-icon {
+  font-family: var(--mono);
+  font-size: 22px;
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: block;
+}
+
+.stack-name {
+  font-family: var(--title);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.stack-desc {
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.stack-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent2);
+  border: 1px solid rgba(255,107,53,0.3);
+  padding: 2px 8px;
+  margin-top: 12px;
+}
+
+/* ── FEATURES ── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.feature-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .25s, transform .2s;
+}
+.feature-card:hover {
+  border-color: rgba(0,212,255,0.3);
+  transform: translateY(-2px);
+}
+.feature-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0;
+  transition: opacity .25s;
+}
+.feature-card:hover::before { opacity: 1; }
+
+.feature-num {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+
+.feature-title {
+  font-family: var(--title);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #fff;
+  margin-bottom: 10px;
+}
+
+.feature-desc {
+  font-size: 14px;
+  font-weight: 300;
+  color: var(--text);
+  line-height: 1.65;
+}
+
+/* ── CODE SNIPPET ── */
+.code-block {
+  background: #050709;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  padding: 24px 28px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.9;
+  overflow-x: auto;
+  margin: 24px 0;
+  position: relative;
+}
+
+.code-block::before {
+  content: attr(data-lang);
+  position: absolute; top: 10px; right: 16px;
+  font-size: 9px; letter-spacing: 2px;
+  color: var(--dim); text-transform: uppercase;
+}
+
+/* ── CHALLENGES ── */
+.challenges-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+}
+
+.challenge-item {
+  padding: 28px 32px;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 32px;
+  transition: background .2s;
+}
+.challenge-item:last-child { border-bottom: none; }
+.challenge-item:hover { background: var(--bg2); }
+
+.challenge-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent2);
+  padding-top: 4px;
+}
+
+.challenge-text {
+  font-size: 15px;
+  font-weight: 300;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.challenge-text strong {
+  color: #fff;
+  font-weight: 500;
+}
+
+/* ── GALLERY / EXAMPLES ── */
+.examples-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+
+.example-card {
+  background: var(--bg2);
+  padding: 0;
+  display: flex; flex-direction: column;
+  text-decoration: none;
+  transition: background .2s;
+  overflow: hidden;
+}
+.example-card:hover { background: var(--bg3); }
+
+.example-preview {
+  height: 180px;
+  background: #090b0f;
+  display: flex; align-items: center; justify-content: center;
+  border-bottom: 1px solid var(--border);
+  font-size: 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+.example-preview svg { width: 100px; height: 100px; }
+
+.example-info { padding: 20px 22px; }
+
+.example-name {
+  font-family: var(--title);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.example-code {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+  line-height: 1.6;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.example-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--accent);
+  margin-top: 10px;
+  text-transform: uppercase;
+}
+
+/* ── CTA FOOTER ── */
+.cta-section {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 120px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.cta-title {
+  font-family: var(--title);
+  font-size: clamp(28px, 4vw, 52px);
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #fff;
+  margin-bottom: 24px;
+}
+
+.cta-title span { color: var(--accent); }
+
+.cta-sub {
+  font-size: 17px;
+  font-weight: 300;
+  color: var(--text);
+  margin-bottom: 48px;
+}
+
+/* ── FOOTER ── */
+footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--border);
+  padding: 28px 40px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+
+.footer-links { display: flex; gap: 24px; }
+.footer-links a { color: var(--dim); text-decoration: none; transition: color .2s; }
+.footer-links a:hover { color: var(--accent); }
+
+/* ── SEPARATOR ── */
+.sep {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  margin: 0;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+
+@keyframes growLine {
+  0%, 100% { transform: scaleY(0); transform-origin: top; }
+  50%       { transform: scaleY(1); transform-origin: top; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+
+.float { animation: float 4s ease-in-out infinite; }
+
+/* Reveal on scroll */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity .7s, transform .7s;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 640px) {
+  nav { padding: 0 20px; }
+  .nav-links a:not(.nav-cta) { display: none; }
+  .challenge-item { grid-template-columns: 1fr; gap: 8px; }
+  footer { flex-direction: column; gap: 16px; text-align: center; }
+}
+</style>
 </head>
 <body>
 
-<div id="header">
-  <div id="logo">REPLICUBE</div>
-  <div id="tabs">
-    <button class="tab active" onclick="switchMode('replicube')">⬛ Replicube</button>
-    <button class="tab" onclick="switchMode('replipaint')">🎨 Replipaint</button>
+<div class="grid-bg"></div>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">REPLICUBE</a>
+  <div class="nav-links">
+    <a href="#stack">Stack</a>
+    <a href="#features">Features</a>
+    <a href="#examples">Examples</a>
+    <a href="editor/index.html" class="nav-cta">▶ Open Editor</a>
   </div>
-  <div id="header-right">ONLINE EDITOR</div>
-</div>
+</nav>
 
-<div id="app">
-  <div id="editor-pane">
-    <div id="editor-toolbar">
-      <button class="btn run" onclick="runCode()">▶ RUN</button>
-      <button class="btn" onclick="clearAll()">✕ CLEAR</button>
-      <button class="btn" onclick="toggleDocs()">? DOCS</button>
-      <button class="btn" onclick="exportPNG()">↓ PNG</button>
-      <span id="token-count">tokens: 0</span>
-    </div>
-    <div id="editor-wrap">
-      <div id="line-numbers"></div>
-      <textarea id="code-editor" spellcheck="false"></textarea>
-    </div>
-    <div id="console"><span class="log-info">// consola — Ctrl+Enter para ejecutar</span></div>
+<!-- HERO -->
+<div class="hero">
+  <p class="hero-eyebrow">// Browser-based creative coding tool</p>
+  <h1 class="hero-title">REPLI<span>CUBE</span></h1>
+  <p class="hero-subtitle-mono">3D Voxels &amp; 2D Pixel Art — Powered by Lua</p>
+  <p class="hero-desc">
+    Write a function. Get a 3D world. A procedural voxel and pixel editor that runs entirely in the browser — no installs, no servers, no build steps.
+  </p>
+  <div class="hero-actions">
+    <a href="editor/index.html" class="btn-primary">▶ &nbsp;Launch Editor</a>
+    <a href="https://github.com/yourusername/replicube" target="_blank" class="btn-secondary">⌥ &nbsp;View on GitHub</a>
   </div>
 
-  <div id="resize-handle"></div>
-
-  <div id="viewport-pane">
-    <div id="viewport-toolbar">
-      <span id="viewport-label">3D VOXEL VIEW</span>
-      <button class="vbtn" onclick="resetCamera()">⟳ CAM</button>
-      <button class="vbtn" id="grid-btn" onclick="toggleGrid()">⊞ GRID</button>
-      <button class="vbtn" id="axes-btn" onclick="toggleAxes()">⊕ AXES</button>
-      <label id="size-label">SIZE&nbsp;<span id="size-val">6</span></label>
-      <input id="size-slider" type="range" min="1" max="10" value="6" step="1" oninput="onSizeSlider(this.value)">
-      <div id="clip-controls">
-        <span class="clip-lbl" style="color:#ff2244">X≤<span id="clip-x-val">6</span></span>
-        <input class="clip-sl" id="clip-x" type="range" min="-6" max="6" value="6" step="1" oninput="onClipSlider('x',this.value)">
-        <span class="clip-lbl" style="color:#39ff14">Y≤<span id="clip-y-val">6</span></span>
-        <input class="clip-sl" id="clip-y" type="range" min="-6" max="6" value="6" step="1" oninput="onClipSlider('y',this.value)">
-        <span class="clip-lbl" style="color:#4499ff">Z≤<span id="clip-z-val">6</span></span>
-        <input class="clip-sl" id="clip-z" type="range" min="-6" max="6" value="6" step="1" oninput="onClipSlider('z',this.value)">
+  <!-- Editor Preview Mockup -->
+  <div class="preview-frame">
+    <div class="preview-window">
+      <div class="preview-titlebar">
+        <div class="preview-dot" style="background:#ff5f57"></div>
+        <div class="preview-dot" style="background:#ffbd2e"></div>
+        <div class="preview-dot" style="background:#28c840"></div>
+        <span class="preview-titlebar-text">REPLICUBE — ONLINE EDITOR</span>
+      </div>
+      <div class="preview-body">
+        <div class="preview-editor-pane">
+          <div class="code-comment">-- sphere with hollow core</div>
+          <br>
+          <div><span class="code-keyword">local</span> d = <span class="code-fn">sqrt</span>(</div>
+          <div>&nbsp;&nbsp;x*x + y*y + z*z</div>
+          <div>)</div>
+          <br>
+          <div><span class="code-keyword">if</span> <span class="code-fn">inrange</span>(d,</div>
+          <div>&nbsp;&nbsp;<span class="code-number">3.5</span>, <span class="code-number">6</span>) <span class="code-keyword">then</span></div>
+          <div>&nbsp;&nbsp;<span class="code-keyword">return</span></div>
+          <div>&nbsp;&nbsp;&nbsp;&nbsp;(<span class="code-fn">floor</span>(d) % <span class="code-number">16</span>)</div>
+          <div>&nbsp;&nbsp;&nbsp;&nbsp;+ <span class="code-number">1</span></div>
+          <div><span class="code-keyword">end</span></div>
+        </div>
+        <div class="preview-viewport">
+          <!-- Isometric voxel preview SVG -->
+          <svg class="voxel-preview-svg float" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <!-- Isometric voxels forming a sphere shape -->
+            <!-- Row 1 top -->
+            <g filter="url(#glow)" opacity="0.9">
+              <!-- top face, side face, right face pattern for each cube -->
+              <!-- cube (0,2) -->
+              <polygon points="100,40 116,50 100,60 84,50" fill="#596ca3"/>
+              <polygon points="84,50 100,60 100,76 84,66" fill="#3a4a7a"/>
+              <polygon points="100,60 116,50 116,66 100,76" fill="#2c3ac1"/>
+              <!-- cube (1,1) -->
+              <polygon points="116,50 132,60 116,70 100,60" fill="#ee57ad"/>
+              <polygon points="100,60 116,70 116,86 100,76" fill="#a33a78"/>
+              <polygon points="116,70 132,60 132,76 116,86" fill="#c44090"/>
+              <!-- cube (-1,1) -->
+              <polygon points="84,50 100,60 84,70 68,60" fill="#ee57ad"/>
+              <polygon points="68,60 84,70 84,86 68,76" fill="#a33a78"/>
+              <polygon points="84,70 100,60 100,76 84,86" fill="#c44090"/>
+              <!-- cube (0,0) -->
+              <polygon points="100,60 116,70 100,80 84,70" fill="#22b341"/>
+              <polygon points="84,70 100,80 100,96 84,86" fill="#155a28"/>
+              <polygon points="100,80 116,70 116,86 100,96" fill="#1a8033"/>
+              <!-- cube (2,0) -->
+              <polygon points="132,60 148,70 132,80 116,70" fill="#fa194e"/>
+              <polygon points="116,70 132,80 132,96 116,86" fill="#a01030"/>
+              <polygon points="132,80 148,70 148,86 132,96" fill="#c01540"/>
+              <!-- cube (-2,0) -->
+              <polygon points="68,60 84,70 68,80 52,70" fill="#fa194e"/>
+              <polygon points="52,70 68,80 68,96 52,86" fill="#a01030"/>
+              <polygon points="68,80 84,70 84,86 68,96" fill="#c01540"/>
+              <!-- cube (1,-1) -->
+              <polygon points="116,70 132,80 116,90 100,80" fill="#ffe461"/>
+              <polygon points="100,80 116,90 116,106 100,96" fill="#a09020"/>
+              <polygon points="116,90 132,80 132,96 116,106" fill="#c0b030"/>
+              <!-- cube (-1,-1) -->
+              <polygon points="84,70 100,80 84,90 68,80" fill="#ffe461"/>
+              <polygon points="68,80 84,90 84,106 68,96" fill="#a09020"/>
+              <polygon points="84,90 100,80 100,96 84,106" fill="#c0b030"/>
+              <!-- cube (0,-2) -->
+              <polygon points="100,80 116,90 100,100 84,90" fill="#65abf2"/>
+              <polygon points="84,90 100,100 100,116 84,106" fill="#3060a0"/>
+              <polygon points="100,100 116,90 116,106 100,116" fill="#4080c0"/>
+            </g>
+            <!-- Console output text -->
+            <text x="100" y="155" text-anchor="middle" fill="#3a5570" font-family="'Share Tech Mono',monospace" font-size="9">// ok — 1274 voxels</text>
+            <text x="100" y="170" text-anchor="middle" fill="#00d4ff" font-family="'Share Tech Mono',monospace" font-size="8">drag to orbit · scroll to zoom</text>
+          </svg>
+        </div>
       </div>
     </div>
-    <div id="viewport">
-      <canvas id="three-canvas"></canvas>
-      <canvas id="anno-canvas"></canvas>
-      <canvas id="paint-canvas"></canvas>
-      <div id="stats-overlay">
-        voxels: <span id="voxel-count">0</span> &nbsp;|&nbsp; drag: orbitar &nbsp;|&nbsp; scroll: zoom
-      </div>
-      <div id="palette-bar"></div>
+  </div>
+
+  <div class="scroll-hint">SCROLL</div>
+</div>
+
+<span class="sep"></span>
+
+<!-- TECH STACK -->
+<section id="stack">
+  <div class="reveal">
+    <span class="section-label">// tech stack</span>
+    <h2 class="section-title">Zero Backend.<br>Full Power.</h2>
+    <p class="section-desc">Every component runs entirely in the browser. No servers, no compilation, no package managers needed to use it.</p>
+  </div>
+  <div class="stack-grid reveal">
+    <div class="stack-card">
+      <span class="stack-icon">▲</span>
+      <div class="stack-name">THREE.JS</div>
+      <div class="stack-desc">WebGL 3D renderer. Instanced meshes for high-performance voxel rendering with per-color batching and real-time raycasting for hover detection.</div>
+      <span class="stack-tag">WebGL · r128</span>
     </div>
+    <div class="stack-card">
+      <span class="stack-icon">◈</span>
+      <div class="stack-name">FENGARI</div>
+      <div class="stack-desc">Full Lua 5.3 interpreter compiled to WebAssembly. Users write real Lua — not a subset — executed safely in a sandboxed environment each run.</div>
+      <span class="stack-tag">Lua 5.3 · WASM</span>
+    </div>
+    <div class="stack-card">
+      <span class="stack-icon">⬡</span>
+      <div class="stack-name">CANVAS 2D</div>
+      <div class="stack-desc">Dual-canvas architecture: Three.js renders voxels while a transparent overlay canvas draws axis annotations, coordinate labels, and hover tooltips.</div>
+      <span class="stack-tag">Canvas API</span>
+    </div>
+    <div class="stack-card">
+      <span class="stack-icon">○</span>
+      <div class="stack-name">VANILLA JS</div>
+      <div class="stack-desc">No frameworks, no build tools. Pure ES6 with a clean module separation between the palette, engine, and UI — deployable as static files anywhere.</div>
+      <span class="stack-tag">ES6 · No Build</span>
+    </div>
+  </div>
+</section>
+
+<span class="sep"></span>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="reveal">
+    <span class="section-label">// features</span>
+    <h2 class="section-title">How It Works</h2>
+    <p class="section-desc">The core model is simple: write a pure function that receives coordinates and returns a color. The engine does the rest.</p>
+  </div>
+
+  <div class="code-block reveal" data-lang="lua">
+    <span class="code-comment">-- Replicube: receives (x, y, z) → return color index (1-16)</span><br>
+    <span class="code-keyword">local</span> d = <span class="code-fn">sqrt</span>(x*x + y*y + z*z)<br>
+    <span class="code-keyword">if</span> <span class="code-fn">inrange</span>(d, <span class="code-number">4</span>, <span class="code-number">6</span>) <span class="code-keyword">then</span> <span class="code-keyword">return</span> <span class="code-string">GREEN</span> <span class="code-keyword">end</span><br><br>
+    <span class="code-comment">-- Replipaint: receives (x, y) → return color index</span><br>
+    <span class="code-fn">fill</span>(<span class="code-string">BLACK</span>)<br>
+    <span class="code-keyword">return</span> (<span class="code-fn">floor</span>(<span class="code-fn">sqrt</span>(x*x + y*y) / <span class="code-number">6</span>) % <span class="code-number">16</span>) + <span class="code-number">1</span>
+  </div>
+
+  <div class="features-grid reveal">
+    <div class="feature-card">
+      <div class="feature-num">01 ——</div>
+      <div class="feature-title">INSTANCED RENDERING</div>
+      <div class="feature-desc">Voxels are batched by color into InstancedMesh objects. A scene with 15,000 voxels uses only 16 draw calls — one per palette color.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">02 ——</div>
+      <div class="feature-title">LUA SANDBOX</div>
+      <div class="feature-desc">Each Run creates a fresh Fengari Lua state. User code gets math helpers, named color constants, and a sandboxed print() — nothing else.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">03 ——</div>
+      <div class="feature-title">DUAL MODE</div>
+      <div class="feature-desc">Replicube maps 3D coordinates to voxels. Replipaint maps 2D coordinates to pixels on an infinite scrollable canvas. Same scripting model, different dimensions.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">04 ——</div>
+      <div class="feature-title">LIVE ANNOTATIONS</div>
+      <div class="feature-desc">Axis tick marks, coordinate labels, and hover tooltips are drawn on a transparent canvas overlay, precisely projected from 3D world space to 2D screen space.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">05 ——</div>
+      <div class="feature-title">CLIP PLANES</div>
+      <div class="feature-desc">X, Y, Z clip sliders hide voxels beyond a threshold, letting you slice through a structure and inspect its interior without modifying the code.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">06 ——</div>
+      <div class="feature-title">SHARE BY URL</div>
+      <div class="feature-desc">The editor state encodes your Lua script into the URL hash. Share a link and anyone sees exactly your creation — no accounts, no databases.</div>
+    </div>
+  </div>
+</section>
+
+<span class="sep"></span>
+
+<!-- CHALLENGES -->
+<section id="challenges">
+  <div class="reveal">
+    <span class="section-label">// engineering notes</span>
+    <h2 class="section-title">Technical Challenges</h2>
+    <p class="section-desc">The interesting problems that had to be solved to make this work in a browser.</p>
+  </div>
+  <div class="challenges-list reveal">
+    <div class="challenge-item">
+      <div class="challenge-label">Raycasting on instanced meshes</div>
+      <div class="challenge-text">Three.js raycasting returns an <strong>instance ID</strong> on InstancedMesh hits, not a voxel key. The engine maintains a parallel <code>Map&lt;InstancedMesh, entry[]&gt;</code> to translate instance ID back to world coordinates in O(1).</div>
+    </div>
+    <div class="challenge-item">
+      <div class="challenge-label">Lua ↔ JS bridge</div>
+      <div class="challenge-text">Fengari exposes a C-style Lua stack API. Passing cell coordinates and color data out of Lua required injecting a <strong>custom C function</strong> (<code>_jscell</code>) as a Lua global, reading arguments off the stack by position from within a JS closure.</div>
+    </div>
+    <div class="challenge-item">
+      <div class="challenge-label">Annotation projection</div>
+      <div class="challenge-text">Axis tick labels are positioned by <strong>finding the bounding-box edge most visible to the camera</strong> each frame. This avoids labels appearing inside the model by projecting all 4 candidate edge midpoints and picking the one furthest from the view centre.</div>
+    </div>
+    <div class="challenge-item">
+      <div class="challenge-label">Replipaint infinite canvas</div>
+      <div class="challenge-text">The 2D mode recomputes the visible world-coordinate window on every pan or zoom, then <strong>re-executes the Lua function only for visible pixels</strong>. This keeps the pixel count bounded regardless of how far the user scrolls.</div>
+    </div>
+  </div>
+</section>
+
+<span class="sep"></span>
+
+<!-- EXAMPLES -->
+<section id="examples">
+  <div class="reveal">
+    <span class="section-label">// gallery</span>
+    <h2 class="section-title">Examples</h2>
+    <p class="section-desc">Click any example to open it in the editor.</p>
+  </div>
+  <div class="examples-grid reveal">
+
+    <a class="example-card" href="editor/index.html#bWFrZV9leGFtcGxl" target="_blank">
+      <div class="example-preview">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="50" cy="50" rx="30" ry="30" fill="none" stroke="#22b341" stroke-width="3" opacity="0.8"/>
+          <ellipse cx="50" cy="50" rx="22" ry="22" fill="none" stroke="#39ff14" stroke-width="2" opacity="0.6"/>
+          <ellipse cx="50" cy="50" rx="14" ry="14" fill="none" stroke="#8fe132" stroke-width="1.5" opacity="0.5"/>
+        </svg>
+      </div>
+      <div class="example-info">
+        <div class="example-name">HOLLOW SPHERE</div>
+        <div class="example-code">local d = sqrt(x*x+y*y+z*z) if inrange(d,4,6) then return GREEN end</div>
+        <span class="example-tag">→ Open in editor</span>
+      </div>
+    </a>
+
+    <a class="example-card" href="editor/index.html" target="_blank">
+      <div class="example-preview">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <rect x="25" y="25" width="50" height="50" fill="none" stroke="#2c3ac1" stroke-width="3"/>
+          <rect x="35" y="35" width="30" height="30" fill="none" stroke="#65abf2" stroke-width="2"/>
+          <rect x="42" y="42" width="16" height="16" fill="none" stroke="#b0d0ff" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="example-info">
+        <div class="example-name">MENGER SPONGE</div>
+        <div class="example-code">local nx=abs(x)%3 local ny=abs(y)%3 local nz=abs(z)%3 ...</div>
+        <span class="example-tag">→ Open in editor</span>
+      </div>
+    </a>
+
+    <a class="example-card" href="editor/index.html" target="_blank">
+      <div class="example-preview">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <line x1="20" y1="80" x2="80" y2="80" stroke="#3a5570" stroke-width="1"/>
+          <path d="M20 80 Q35 20 50 60 Q65 100 80 30" fill="none" stroke="#ff6b35" stroke-width="2.5"/>
+        </svg>
+      </div>
+      <div class="example-info">
+        <div class="example-name">SINE WAVE</div>
+        <div class="example-code">fill(BLACK) local w = floor(sin(x*.15)*15) if abs(y-w)&lt;=1 then return 8 end</div>
+        <span class="example-tag">→ Open in editor</span>
+      </div>
+    </a>
+
+    <a class="example-card" href="editor/index.html" target="_blank">
+      <div class="example-preview">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <g transform="translate(50,50)">
+            <polygon points="0,-28 24,14 -24,14" fill="#fa194e" opacity="0.9"/>
+            <polygon points="0,-18 16,9 -16,9" fill="#596ca3" opacity="0.8"/>
+            <polygon points="0,-10 9,5 -9,5" fill="#ffe461" opacity="0.7"/>
+          </g>
+        </svg>
+      </div>
+      <div class="example-info">
+        <div class="example-name">CONCENTRIC CIRCLES</div>
+        <div class="example-code">local d=sqrt(x*x+y*y) return (floor(d/6)%16)+1</div>
+        <span class="example-tag">→ Open in editor</span>
+      </div>
+    </a>
+
+  </div>
+</section>
+
+<span class="sep"></span>
+
+<!-- CTA -->
+<div class="cta-section reveal">
+  <h2 class="cta-title">WRITE A FUNCTION.<br><span>GET A WORLD.</span></h2>
+  <p class="cta-sub">No installs. No servers. Open the editor and start coding.</p>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+    <a href="editor/index.html" class="btn-primary">▶ &nbsp;Launch Editor</a>
+    <a href="https://github.com/yourusername/replicube" target="_blank" class="btn-secondary">⌥ &nbsp;GitHub</a>
   </div>
 </div>
 
-<!-- DOCS PANEL -->
-<div id="docs-panel">
-  <button class="doc-close" onclick="toggleDocs()">✕ CLOSE</button>
+<!-- FOOTER -->
+<footer>
+  <span>REPLICUBE — Procedural Voxel Editor</span>
+  <div class="footer-links">
+    <a href="https://github.com/yourusername/replicube" target="_blank">GitHub</a>
+    <a href="editor/index.html" target="_blank">Editor</a>
+    <a href="mailto:you@email.com">Contact</a>
+  </div>
+</footer>
 
-  <div id="docs-replicube">
-    <div class="doc-section">
-      <div class="doc-title">REPLICUBE — MODELO DE EJECUCIÓN</div>
-      <p class="doc-p">El código se ejecuta <b>una vez por cada celda</b> (-6 a 6 en x, y, z).</p>
-      <p class="doc-p">Las variables <b>x</b>, <b>y</b>, <b>z</b> están disponibles directamente.</p>
-      <p class="doc-p"><b>return N</b> coloca un voxel de color N. Sin return o return 0/negativo = vacío.</p>
-      <code class="doc-code">-- Cubo rojo macizo
-return 7</code>
-      <code class="doc-code">-- Mitad superior verde, inferior marrón
-if y > 0 then return 11
-else return 15 end</code>
-    </div>
-
-    <div class="doc-section">
-      <div class="doc-title">PALETA (1–16, wrap automático)</div>
-      <p class="doc-p">0 o negativo = vacío. Valores &gt;16 hacen wrap: 17→1, 18→2…</p>
-      <div class="palette-grid" id="palette-grid-3d"></div>
-    </div>
-
-    <div class="doc-section">
-      <div class="doc-title">FUNCIONES DISPONIBLES</div>
-      <p class="doc-p"><span class="doc-fn">abs(a)</span> &nbsp; <span class="doc-fn">floor(a)</span> &nbsp; <span class="doc-fn">ceil(a)</span> &nbsp; <span class="doc-fn">round(a)</span></p>
-      <p class="doc-p"><span class="doc-fn">sqrt(a)</span> &nbsp; <span class="doc-fn">sin(a)</span> &nbsp; <span class="doc-fn">cos(a)</span> &nbsp; <span class="doc-fn">tan(a)</span></p>
-      <p class="doc-p"><span class="doc-fn">asin(a)</span> &nbsp; <span class="doc-fn">acos(a)</span> &nbsp; <span class="doc-fn">atan(a)</span> &nbsp; <span class="doc-fn">atan(y,x)</span></p>
-      <p class="doc-p"><span class="doc-fn">min(a,b)</span> &nbsp; <span class="doc-fn">max(a,b)</span> &nbsp; <span class="doc-fn">log(a)</span></p>
-      <p class="doc-p"><span class="doc-fn">clamp(v, a, b)</span> — limita v entre a y b</p>
-      <p class="doc-p"><span class="doc-fn">inrange(v, a, b)</span> → true si a ≤ v ≤ b</p>
-      <p class="doc-p"><span class="doc-fn">step(a, v)</span> → 1 si a &gt; v, si no 0</p>
-      <p class="doc-p"><span class="doc-fn">sign(a)</span> → 1, −1 ó 0</p>
-      <p class="doc-p"><span class="doc-fn">mix(a, b, t)</span> — interpolación lineal</p>
-      <p class="doc-p"><span class="doc-fn">btoi(bool)</span> → 1 si true, 0 si false</p>
-      <p class="doc-p"><span class="doc-fn">print(...)</span> — escribe en la consola</p>
-      <p class="doc-p"><b>PI</b> = 3.14159…  &nbsp; <b>SIZE</b> = 6</p>
-    </div>
-
-    <div class="doc-section">
-      <div class="doc-title">OPERADORES</div>
-      <p class="doc-p"><b>+  −  *  /  //  %  ^</b></p>
-      <p class="doc-p"><b>//</b> = división entera &nbsp; <b>%</b> = módulo &nbsp; <b>^</b> = potencia</p>
-      <p class="doc-p"><b>&amp;  |  ~  &gt;&gt;  &lt;&lt;</b> — bitwise</p>
-    </div>
-
-    <div class="doc-section">
-      <div class="doc-title">EJEMPLOS</div>
-      <p class="doc-p">Rugby ball (ejemplo oficial):</p>
-      <code class="doc-code">if abs(z) < 3 and abs(y) < 3 then
-  if abs(z) < 2 and x % 2 == 0
-     and abs(x) < 3 and y == 2 then
-    return 1
-  end
-  return 15
-end</code>
-      <p class="doc-p">Escaleras:</p>
-      <code class="doc-code">if x == y and z > 0 then return 2 end
-if x == -y and z < 0 then return 2 end
-if z == 0 then return 7 end
-return 0</code>
-      <p class="doc-p">Esfera hueca:</p>
-      <code class="doc-code">local d = sqrt(x*x + y*y + z*z)
-if inrange(d, 4, 6) then return 11 end</code>
-      <p class="doc-p">Esponja de Menger:</p>
-      <code class="doc-code">local nx = abs(x) % 3
-local ny = abs(y) % 3
-local nz = abs(z) % 3
-local h = btoi(nx==1 and ny==1)
-        + btoi(ny==1 and nz==1)
-        + btoi(nx==1 and nz==1)
-if h == 0 then return 6 end</code>
-      <p class="doc-p">Tablero en el suelo:</p>
-      <code class="doc-code">if y == -6 then
-  if (x + z) % 2 == 0 then return 1
-  else return 3 end
-end</code>
-    </div>
-  </div><!-- /docs-replicube -->
-
-  <div id="docs-replipaint" style="display:none">
-    <div class="doc-section">
-      <div class="doc-title">REPLIPAINT — MODELO DE EJECUCIÓN</div>
-      <p class="doc-p">El código se ejecuta <b>una vez por cada pixel</b> del área visible.</p>
-      <p class="doc-p">Las variables <b>x</b>, <b>y</b> están disponibles directamente.</p>
-      <p class="doc-p"><b>return N</b> pinta el pixel. 0 o sin return = transparente.</p>
-      <code class="doc-code">-- Tablero de ajedrez
-if (x + y) % 2 == 0 then return 1
-else return 3 end</code>
-    </div>
-
-    <div class="doc-section">
-      <div class="doc-title">FUNCIÓN EXTRA</div>
-      <p class="doc-p"><span class="doc-fn">fill(colorIndex)</span> — rellena el fondo con un color de paleta</p>
-      <p class="doc-p">Todas las demás funciones de Replicube también están disponibles.</p>
-    </div>
-
-    <div class="doc-section">
-      <div class="doc-title">PALETA (1–16)</div>
-      <div class="palette-grid" id="palette-grid-2d"></div>
-    </div>
-
-    <div class="doc-section">
-      <div class="doc-title">EJEMPLOS</div>
-      <p class="doc-p">Círculos concéntricos:</p>
-      <code class="doc-code">local d = sqrt(x*x + y*y)
-return (floor(d / 6) % 16) + 1</code>
-      <p class="doc-p">Onda de seno:</p>
-      <code class="doc-code">fill(3)
-local wave = floor(sin(x * 0.15) * 15)
-if abs(y - wave) <= 1 then return 8 end</code>
-      <p class="doc-p">Degradado diagonal:</p>
-      <code class="doc-code">return ((x + y) % 16 + 16) % 16 + 1</code>
-    </div>
-  </div><!-- /docs-replipaint -->
-</div><!-- /docs-panel -->
-
-<script src="palette.js"></script>
-<script src="engine.js"></script>
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
 </body>
 </html>
