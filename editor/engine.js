@@ -16,6 +16,7 @@ let isDragging = false, lastX = 0, lastY = 0;
 let theta = 0.7, phi = 0.6, radius = 28;
 let resizing = false, resizeStartX = 0, resizeStartW = 0;
 let _autoRunTimer = null;
+let _loadingFromURL = false; // ← flag para evitar que switchMode sobreescriba el editor
 
 const PNAMES = ['','WHITE','GREY','BLACK','PEACH','PINK','PURPLE','RED',
   'ORANGE','YELLOW','LIGHTGREEN','GREEN','DARKBLUE','BLUE','LIGHTBLUE','BROWN','DARKBROWN'];
@@ -382,7 +383,6 @@ function runCode(){
     if(currentMode==='replicube') runReplicube(code);
     else runReplipaint(code);
   }catch(e){ logMsg('// runtime error: '+e.message,'log-error'); }
-  shareToURL();
 }
 
 function runReplicube(userCode){
@@ -406,7 +406,13 @@ end end end
     _jsprint:(s)=>{logs.push(fengari.to_jsstring(fengari.lua.lua_tostring(s,1)||fengari.to_luastring('')));return 0;}
   },(err)=>{
     if(err) logMsg('// error: '+err,'log-error');
-    else{ voxelMap=staging;rebuildMeshes();logMsg('// ok — '+Object.keys(voxelMap).length+' voxels','log-success');if(n>=MAX)logMsg('// aviso: límite alcanzado','log-error');logs.forEach(l=>logMsg('// '+l));}
+    else{
+      voxelMap=staging; rebuildMeshes();
+      logMsg('// ok — '+Object.keys(voxelMap).length+' voxels','log-success');
+      if(n>=MAX) logMsg('// aviso: límite alcanzado','log-error');
+      logs.forEach(l=>logMsg('// '+l));
+      shareToURL(); // ← dentro del callback, cuando el resultado ya es definitivo
+    }
   });
 }
 
@@ -431,7 +437,12 @@ end end
     _jsprint:(s)=>{logs.push(fengari.to_jsstring(fengari.lua.lua_tostring(s,1)||fengari.to_luastring('')));return 0;}
   },(err)=>{
     if(err) logMsg('// error: '+err,'log-error');
-    else{ paintPixels=sp;bgPaletteIdx=sb;redrawPaint();logMsg('// ok — '+Object.keys(paintPixels).length+' pixels','log-success');logs.forEach(l=>logMsg('// '+l));}
+    else{
+      paintPixels=sp; bgPaletteIdx=sb; redrawPaint();
+      logMsg('// ok — '+Object.keys(paintPixels).length+' pixels','log-success');
+      logs.forEach(l=>logMsg('// '+l));
+      shareToURL(); // ← dentro del callback
+    }
   });
 }
 
@@ -479,7 +490,11 @@ function loadFromURL() {
   try {
     const payload = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
     if (payload.code) {
+      _loadingFromURL = true;
+      // Si el modo es diferente, cambiamos el modo SIN sobreescribir el editor
       if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
+      _loadingFromURL = false;
+      // Ahora sí ponemos el código guardado
       editor.value = payload.code;
       return true;
     }
@@ -561,7 +576,10 @@ function switchMode(mode){
   document.getElementById('clip-controls').style.display=is3D?'flex':'none';
   document.getElementById('docs-replicube').style.display=is3D?'block':'none';
   document.getElementById('docs-replipaint').style.display=is3D?'none':'block';
-  editor.value=defaultCode[mode];
+  // Solo sobreescribir el editor si NO estamos restaurando desde URL
+  if (!_loadingFromURL) {
+    editor.value=defaultCode[mode];
+  }
   updateLineNumbers(); updateTokenCount();
   if(!is3D) setTimeout(()=>redrawPaint(),50);
 }
