@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "mode": "replicube",
+  "gridSize": 3,
+  "code": "if abs(x) == 3 and abs(y) == 3 or\n   abs(x) == 3 and abs(z) == 3 or\n   abs(y) == 3 and abs(z) == 3 then\nreturn 3\nend\nif abs(x) == 3 then\nreturn 14\nend\nif abs(y) == 3 then\nreturn 10\nend\nif abs(z) == 3 then\nreturn 7\nend"
+}
