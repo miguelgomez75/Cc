@@ -411,7 +411,6 @@ end end end
       logMsg('// ok — '+Object.keys(voxelMap).length+' voxels','log-success');
       if(n>=MAX) logMsg('// aviso: límite alcanzado','log-error');
       logs.forEach(l=>logMsg('// '+l));
-      shareToURL(); // ← dentro del callback, cuando el resultado ya es definitivo
     }
   });
 }
@@ -441,7 +440,6 @@ end end
       paintPixels=sp; bgPaletteIdx=sb; redrawPaint();
       logMsg('// ok — '+Object.keys(paintPixels).length+' pixels','log-success');
       logs.forEach(l=>logMsg('// '+l));
-      shareToURL(); // ← dentro del callback
     }
   });
 }
@@ -458,50 +456,71 @@ function execLua(code,fns,cb){
 }
 
 // ═══════════════════════════════════════════════════════════
-//  SHARE BY URL
+//  EXPORT / IMPORT
 // ═══════════════════════════════════════════════════════════
-function shareToURL() {
-  try {
-    const payload = JSON.stringify({ mode: currentMode, code: editor.value });
-    const encoded = btoa(unescape(encodeURIComponent(payload)));
-    history.replaceState(null, '', '#' + encoded);
-  } catch (e) {
-    // silencioso — puede fallar si el código es muy largo
-  }
+
+function exportSketch() {
+  const payload = {
+    version: 1,
+    mode: currentMode,
+    gridSize: gridSize,
+    code: editor.value
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  // nombre de archivo: replicube_YYYYMMDD_HHMM.json
+  const now  = new Date();
+  const ts   = now.getFullYear().toString()
+    + String(now.getMonth()+1).padStart(2,'0')
+    + String(now.getDate()).padStart(2,'0')
+    + '_' + String(now.getHours()).padStart(2,'0')
+    + String(now.getMinutes()).padStart(2,'0');
+  a.href     = url;
+  a.download = `replicube_${ts}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  logMsg('// exportado: replicube_'+ts+'.json', 'log-info');
 }
 
-function copyShareURL() {
-  shareToURL();
-  navigator.clipboard.writeText(location.href).then(() => {
-    const btn = document.getElementById('share-btn');
-    if (btn) {
-      const prev = btn.textContent;
-      btn.textContent = '✓ COPIED';
-      btn.style.color = 'var(--green)';
-      setTimeout(() => { btn.textContent = prev; btn.style.color = ''; }, 1800);
-    }
-  }).catch(() => {
-    prompt('Copia esta URL:', location.href);
+function importSketch() {
+  const input = document.createElement('input');
+  input.type  = 'file';
+  input.accept = '.json,application/json';
+  input.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const payload = JSON.parse(evt.target.result);
+        if (!payload.code) throw new Error('archivo inválido — falta "code"');
+
+        // Restaurar modo
+        _loadingFromURL = true;
+        if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
+        _loadingFromURL = false;
+
+        // Restaurar tamaño de grid
+        if (payload.gridSize && payload.gridSize !== gridSize) {
+          const sl = document.getElementById('size-slider');
+          if (sl) sl.value = payload.gridSize;
+          onSizeSlider(payload.gridSize);
+        }
+
+        // Restaurar código y ejecutar
+        editor.value = payload.code;
+        updateLineNumbers();
+        updateTokenCount();
+        runCode();
+        logMsg('// importado: ' + file.name, 'log-success');
+      } catch (err) {
+        logMsg('// error al importar: ' + err.message, 'log-error');
+      }
+    };
+    reader.readAsText(file);
   });
-}
-
-function loadFromURL() {
-  if (!location.hash || location.hash.length < 4) return false;
-  try {
-    const payload = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
-    if (payload.code) {
-      _loadingFromURL = true;
-      // Si el modo es diferente, cambiamos el modo SIN sobreescribir el editor
-      if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
-      _loadingFromURL = false;
-      // Ahora sí ponemos el código guardado
-      editor.value = payload.code;
-      return true;
-    }
-  } catch (e) {
-    // hash inválido — ignorar
-  }
-  return false;
+  input.click();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -617,26 +636,23 @@ buildPaletteGrid('palette-grid-3d');
 buildPaletteGrid('palette-grid-2d');
 buildPaletteBar();
 
-if (!loadFromURL()) {
-  editor.value = defaultCode.replicube;
-}
-
+editor.value = defaultCode.replicube;
 updateLineNumbers();
 updateTokenCount();
 
 // Expose globals needed by HTML onclick attributes
-window.runCode      = runCode;
-window.clearAll     = clearAll;
-window.toggleDocs   = toggleDocs;
-window.exportPNG    = exportPNG;
-window.resetCamera  = resetCamera;
-window.toggleGrid   = toggleGrid;
-window.toggleAxes   = toggleAxes;
-window.switchMode   = switchMode;
-window.onSizeSlider = onSizeSlider;
-window.onClipSlider = onClipSlider;
-window.copyShareURL = copyShareURL;
-window.shareToURL   = shareToURL;
+window.runCode       = runCode;
+window.clearAll      = clearAll;
+window.toggleDocs    = toggleDocs;
+window.exportPNG     = exportPNG;
+window.exportSketch  = exportSketch;
+window.importSketch  = importSketch;
+window.resetCamera   = resetCamera;
+window.toggleGrid    = toggleGrid;
+window.toggleAxes    = toggleAxes;
+window.switchMode    = switchMode;
+window.onSizeSlider  = onSizeSlider;
+window.onClipSlider  = onClipSlider;
 
 setTimeout(()=>runCode(), 200);
 
