@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Replicube — Procedural Voxel & Pixel Editor</title>
-<meta name="description" content="A browser-based procedural voxel and 2D pixel editor powered by Lua scripting, Three.js, and WebGL. No install required.">
+<title>Replicube — Editor Voxel y Pixel Procedimental</title>
+<meta name="description" content="Editor procedimental de vóxeles 3D y píxeles 2D con scripting Lua, Three.js y WebGL. Sin instalación, funciona en el navegador.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -672,23 +672,23 @@ footer {
   <a href="#" class="nav-logo">REPLICUBE</a>
   <div class="nav-links">
     <a href="#stack">Stack</a>
-    <a href="#features">Features</a>
-    <a href="#examples">Examples</a>
-    <a href="editor/index.html" class="nav-cta">▶ Open Editor</a>
+    <a href="#features">Funciones</a>
+    <a href="#examples">Galería</a>
+    <a href="editor/index.html" class="nav-cta">▶ Abrir Editor</a>
   </div>
 </nav>
 
 <!-- HERO -->
 <div class="hero">
-  <p class="hero-eyebrow">// Browser-based creative coding tool</p>
+  <p class="hero-eyebrow">// Herramienta de creative coding para el navegador</p>
   <h1 class="hero-title">REPLI<span>CUBE</span></h1>
-  <p class="hero-subtitle-mono">3D Voxels &amp; 2D Pixel Art — Powered by Lua</p>
+  <p class="hero-subtitle-mono">Vóxeles 3D y Pixel Art 2D — Con Lua</p>
   <p class="hero-desc">
-    Write a function. Get a 3D world. A procedural voxel and pixel editor that runs entirely in the browser — no installs, no servers, no build steps.
+    Escribe una función. Obtén un mundo 3D. Un editor procedimental de vóxeles y píxeles que funciona completamente en el navegador — sin instalaciones, sin servidores, sin pasos de compilación.
   </p>
   <div class="hero-actions">
-    <a href="editor/index.html" class="btn-primary">▶ &nbsp;Launch Editor</a>
-    <a href="https://github.com/miguelgomez75/Cc" target="_blank" class="btn-secondary">⌥ &nbsp;View on GitHub</a>
+    <a href="editor/index.html" class="btn-primary">▶ &nbsp;Abrir Editor</a>
+    <a href="https://github.com/miguelgomez75/Cc" target="_blank" class="btn-secondary">⌥ &nbsp;Ver en GitHub</a>
   </div>
 
   <!-- Editor Preview Mockup -->
@@ -764,7 +764,7 @@ footer {
             </g>
             <!-- Console output text -->
             <text x="100" y="155" text-anchor="middle" fill="#3a5570" font-family="'Share Tech Mono',monospace" font-size="9">// ok — 1274 voxels</text>
-            <text x="100" y="170" text-anchor="middle" fill="#00d4ff" font-family="'Share Tech Mono',monospace" font-size="8">drag to orbit · scroll to zoom</text>
+            <text x="100" y="170" text-anchor="middle" fill="#00d4ff" font-family="'Share Tech Mono',monospace" font-size="8">arrastra para orbitar · scroll para zoom</text>
           </svg>
         </div>
       </div>
@@ -779,33 +779,33 @@ footer {
 <!-- TECH STACK -->
 <section id="stack">
   <div class="reveal">
-    <span class="section-label">// tech stack</span>
-    <h2 class="section-title">Zero Backend.<br>Full Power.</h2>
-    <p class="section-desc">Every component runs entirely in the browser. No servers, no compilation, no package managers needed to use it.</p>
+    <span class="section-label">// stack técnico</span>
+    <h2 class="section-title">Cero Backend.<br>Máxima Potencia.</h2>
+    <p class="section-desc">Cada componente funciona completamente en el navegador. Sin servidores, sin compilación, sin gestores de paquetes.</p>
   </div>
   <div class="stack-grid reveal">
     <div class="stack-card">
       <span class="stack-icon">▲</span>
       <div class="stack-name">THREE.JS</div>
-      <div class="stack-desc">WebGL 3D renderer. Instanced meshes for high-performance voxel rendering with per-color batching and real-time raycasting for hover detection.</div>
+      <div class="stack-desc">Renderizador 3D WebGL. Usa InstancedMesh para renderizar vóxeles en batch por color con un máximo de 16 draw calls, y raycasting en tiempo real para detección de hover.</div>
       <span class="stack-tag">WebGL · r128</span>
     </div>
     <div class="stack-card">
       <span class="stack-icon">◈</span>
       <div class="stack-name">FENGARI</div>
-      <div class="stack-desc">Full Lua 5.3 interpreter compiled to WebAssembly. Users write real Lua — not a subset — executed safely in a sandboxed environment each run.</div>
+      <div class="stack-desc">Intérprete completo de Lua 5.3 compilado a WebAssembly. El usuario escribe Lua real — no un subconjunto — ejecutado de forma segura en un entorno aislado en cada ejecución.</div>
       <span class="stack-tag">Lua 5.3 · WASM</span>
     </div>
     <div class="stack-card">
       <span class="stack-icon">⬡</span>
       <div class="stack-name">CANVAS 2D</div>
-      <div class="stack-desc">Dual-canvas architecture: Three.js renders voxels while a transparent overlay canvas draws axis annotations, coordinate labels, and hover tooltips.</div>
+      <div class="stack-desc">Arquitectura de doble canvas: Three.js renderiza los vóxeles mientras un canvas superpuesto transparente dibuja las anotaciones de ejes, etiquetas de coordenadas y tooltips.</div>
       <span class="stack-tag">Canvas API</span>
     </div>
     <div class="stack-card">
       <span class="stack-icon">○</span>
       <div class="stack-name">VANILLA JS</div>
-      <div class="stack-desc">No frameworks, no build tools. Pure ES6 with a clean module separation between the palette, engine, and UI — deployable as static files anywhere.</div>
+      <div class="stack-desc">Sin frameworks, sin herramientas de compilación. ES6 puro con separación limpia entre paleta, motor y UI — desplegable como archivos estáticos en cualquier sitio.</div>
       <span class="stack-tag">ES6 · No Build</span>
     </div>
   </div>
@@ -816,16 +816,16 @@ footer {
 <!-- FEATURES -->
 <section id="features">
   <div class="reveal">
-    <span class="section-label">// features</span>
-    <h2 class="section-title">How It Works</h2>
-    <p class="section-desc">The core model is simple: write a pure function that receives coordinates and returns a color. The engine does the rest.</p>
+    <span class="section-label">// características</span>
+    <h2 class="section-title">Cómo Funciona</h2>
+    <p class="section-desc">El modelo es simple: escribe una función pura que recibe coordenadas y devuelve un color. El motor hace el resto.</p>
   </div>
 
   <div class="code-block reveal" data-lang="lua">
-    <span class="code-comment">-- Replicube: receives (x, y, z) → return color index (1-16)</span><br>
+    <span class="code-comment">-- Replicube: recibe (x, y, z) → devuelve índice de color (1-16)</span><br>
     <span class="code-keyword">local</span> d = <span class="code-fn">sqrt</span>(x*x + y*y + z*z)<br>
     <span class="code-keyword">if</span> <span class="code-fn">inrange</span>(d, <span class="code-number">4</span>, <span class="code-number">6</span>) <span class="code-keyword">then</span> <span class="code-keyword">return</span> <span class="code-string">GREEN</span> <span class="code-keyword">end</span><br><br>
-    <span class="code-comment">-- Replipaint: receives (x, y) → return color index</span><br>
+    <span class="code-comment">-- Replipaint: recibe (x, y) → devuelve índice de color</span><br>
     <span class="code-fn">fill</span>(<span class="code-string">BLACK</span>)<br>
     <span class="code-keyword">return</span> (<span class="code-fn">floor</span>(<span class="code-fn">sqrt</span>(x*x + y*y) / <span class="code-number">6</span>) % <span class="code-number">16</span>) + <span class="code-number">1</span>
   </div>
@@ -833,33 +833,33 @@ footer {
   <div class="features-grid reveal">
     <div class="feature-card">
       <div class="feature-num">01 ——</div>
-      <div class="feature-title">INSTANCED RENDERING</div>
-      <div class="feature-desc">Voxels are batched by color into InstancedMesh objects. A scene with 15,000 voxels uses only 16 draw calls — one per palette color.</div>
+      <div class="feature-title">RENDERIZADO INSTANCIADO</div>
+      <div class="feature-desc">Los vóxeles se agrupan por color en objetos InstancedMesh. Una escena con 15.000 vóxeles usa solo 16 draw calls — uno por color de paleta.</div>
     </div>
     <div class="feature-card">
       <div class="feature-num">02 ——</div>
-      <div class="feature-title">LUA SANDBOX</div>
-      <div class="feature-desc">Each Run creates a fresh Fengari Lua state. User code gets math helpers, named color constants, and a sandboxed print() — nothing else.</div>
+      <div class="feature-title">SANDBOX DE LUA</div>
+      <div class="feature-desc">Cada ejecución crea un estado Lua de Fengari desde cero. El código de usuario recibe helpers matemáticos, constantes de color y un print() aislado — nada más.</div>
     </div>
     <div class="feature-card">
       <div class="feature-num">03 ——</div>
-      <div class="feature-title">DUAL MODE</div>
-      <div class="feature-desc">Replicube maps 3D coordinates to voxels. Replipaint maps 2D coordinates to pixels on an infinite scrollable canvas. Same scripting model, different dimensions.</div>
+      <div class="feature-title">MODO DUAL</div>
+      <div class="feature-desc">Replicube mapea coordenadas 3D a vóxeles. Replipaint mapea coordenadas 2D a píxeles en un canvas infinito desplazable. Mismo modelo de scripting, distintas dimensiones.</div>
     </div>
     <div class="feature-card">
       <div class="feature-num">04 ——</div>
-      <div class="feature-title">LIVE ANNOTATIONS</div>
-      <div class="feature-desc">Axis tick marks, coordinate labels, and hover tooltips are drawn on a transparent canvas overlay, precisely projected from 3D world space to 2D screen space.</div>
+      <div class="feature-title">ANOTACIONES EN VIVO</div>
+      <div class="feature-desc">Las marcas de ejes, etiquetas de coordenadas y tooltips se dibujan en un canvas superpuesto transparente, proyectados con precisión desde el espacio 3D al espacio de pantalla.</div>
     </div>
     <div class="feature-card">
       <div class="feature-num">05 ——</div>
-      <div class="feature-title">CLIP PLANES</div>
-      <div class="feature-desc">X, Y, Z clip sliders hide voxels beyond a threshold, letting you slice through a structure and inspect its interior without modifying the code.</div>
+      <div class="feature-title">PLANOS DE CORTE</div>
+      <div class="feature-desc">Los sliders de corte X, Y, Z ocultan vóxeles más allá de un umbral, permitiendo seccionar una estructura e inspeccionar su interior sin modificar el código.</div>
     </div>
     <div class="feature-card">
       <div class="feature-num">06 ——</div>
-      <div class="feature-title">SHARE BY URL</div>
-      <div class="feature-desc">The editor state encodes your Lua script into the URL hash. Share a link and anyone sees exactly your creation — no accounts, no databases.</div>
+      <div class="feature-title">EXPORTAR / IMPORTAR</div>
+      <div class="feature-desc">Exporta tu sketch como archivo JSON con el código y el tamaño del grid. Importa cualquier archivo para restaurar el estado exacto del editor — sin cuentas, sin servidores.</div>
     </div>
   </div>
 </section>
@@ -869,26 +869,26 @@ footer {
 <!-- CHALLENGES -->
 <section id="challenges">
   <div class="reveal">
-    <span class="section-label">// engineering notes</span>
-    <h2 class="section-title">Technical Challenges</h2>
-    <p class="section-desc">The interesting problems that had to be solved to make this work in a browser.</p>
+    <span class="section-label">// notas de ingeniería</span>
+    <h2 class="section-title">Retos Técnicos</h2>
+    <p class="section-desc">Los problemas interesantes que hubo que resolver para que todo esto funcione en un navegador.</p>
   </div>
   <div class="challenges-list reveal">
     <div class="challenge-item">
-      <div class="challenge-label">Raycasting on instanced meshes</div>
-      <div class="challenge-text">Three.js raycasting returns an <strong>instance ID</strong> on InstancedMesh hits, not a voxel key. The engine maintains a parallel <code>Map&lt;InstancedMesh, entry[]&gt;</code> to translate instance ID back to world coordinates in O(1).</div>
+      <div class="challenge-label">Raycasting en meshes instanciados</div>
+      <div class="challenge-text">El raycasting de Three.js devuelve un <strong>instance ID</strong> al impactar un InstancedMesh, no una clave de vóxel. El motor mantiene un <code>Map&lt;InstancedMesh, entry[]&gt;</code> paralelo para traducir el ID a coordenadas de mundo en O(1).</div>
     </div>
     <div class="challenge-item">
-      <div class="challenge-label">Lua ↔ JS bridge</div>
-      <div class="challenge-text">Fengari exposes a C-style Lua stack API. Passing cell coordinates and color data out of Lua required injecting a <strong>custom C function</strong> (<code>_jscell</code>) as a Lua global, reading arguments off the stack by position from within a JS closure.</div>
+      <div class="challenge-label">Puente Lua ↔ JS</div>
+      <div class="challenge-text">Fengari expone una API de pila al estilo C de Lua. Pasar coordenadas y color desde Lua a JS requirió inyectar una <strong>función C personalizada</strong> (<code>_jscell</code>) como global de Lua, leyendo los argumentos de la pila por posición desde un closure JS.</div>
     </div>
     <div class="challenge-item">
-      <div class="challenge-label">Annotation projection</div>
-      <div class="challenge-text">Axis tick labels are positioned by <strong>finding the bounding-box edge most visible to the camera</strong> each frame. This avoids labels appearing inside the model by projecting all 4 candidate edge midpoints and picking the one furthest from the view centre.</div>
+      <div class="challenge-label">Proyección de anotaciones</div>
+      <div class="challenge-text">Las etiquetas de los ejes se posicionan <strong>encontrando la arista del bounding box más visible para la cámara</strong> en cada frame. Esto evita que aparezcan dentro del modelo proyectando los 4 puntos medios candidatos y eligiendo el más alejado del centro de la vista.</div>
     </div>
     <div class="challenge-item">
-      <div class="challenge-label">Replipaint infinite canvas</div>
-      <div class="challenge-text">The 2D mode recomputes the visible world-coordinate window on every pan or zoom, then <strong>re-executes the Lua function only for visible pixels</strong>. This keeps the pixel count bounded regardless of how far the user scrolls.</div>
+      <div class="challenge-label">Canvas infinito de Replipaint</div>
+      <div class="challenge-text">El modo 2D recalcula la ventana de coordenadas de mundo visible en cada desplazamiento o zoom, y <strong>re-ejecuta la función Lua solo para los píxeles visibles</strong>. Esto mantiene el conteo de píxeles acotado sin importar cuánto se desplace el usuario.</div>
     </div>
   </div>
 </section>
@@ -898,95 +898,153 @@ footer {
 <!-- EXAMPLES -->
 <section id="examples">
   <div class="reveal">
-    <span class="section-label">// gallery</span>
-    <h2 class="section-title">Examples</h2>
-    <p class="section-desc">Click any example to open it in the editor.</p>
+    <span class="section-label">// galería</span>
+    <h2 class="section-title">Mis Proyectos</h2>
+    <p class="section-desc">Haz clic en cualquier proyecto para abrirlo en el editor.</p>
   </div>
-  <div class="examples-grid reveal">
-
-    <a class="example-card" href="editor/index.html#bWFrZV9leGFtcGxl" target="_blank">
-      <div class="example-preview">
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="50" cy="50" rx="30" ry="30" fill="none" stroke="#22b341" stroke-width="3" opacity="0.8"/>
-          <ellipse cx="50" cy="50" rx="22" ry="22" fill="none" stroke="#39ff14" stroke-width="2" opacity="0.6"/>
-          <ellipse cx="50" cy="50" rx="14" ry="14" fill="none" stroke="#8fe132" stroke-width="1.5" opacity="0.5"/>
-        </svg>
-      </div>
-      <div class="example-info">
-        <div class="example-name">HOLLOW SPHERE</div>
-        <div class="example-code">local d = sqrt(x*x+y*y+z*z) if inrange(d,4,6) then return GREEN end</div>
-        <span class="example-tag">→ Open in editor</span>
-      </div>
-    </a>
-
-    <a class="example-card" href="editor/index.html" target="_blank">
-      <div class="example-preview">
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-          <rect x="25" y="25" width="50" height="50" fill="none" stroke="#2c3ac1" stroke-width="3"/>
-          <rect x="35" y="35" width="30" height="30" fill="none" stroke="#65abf2" stroke-width="2"/>
-          <rect x="42" y="42" width="16" height="16" fill="none" stroke="#b0d0ff" stroke-width="1.5"/>
-        </svg>
-      </div>
-      <div class="example-info">
-        <div class="example-name">MENGER SPONGE</div>
-        <div class="example-code">local nx=abs(x)%3 local ny=abs(y)%3 local nz=abs(z)%3 ...</div>
-        <span class="example-tag">→ Open in editor</span>
-      </div>
-    </a>
-
-    <a class="example-card" href="editor/index.html" target="_blank">
-      <div class="example-preview">
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-          <line x1="20" y1="80" x2="80" y2="80" stroke="#3a5570" stroke-width="1"/>
-          <path d="M20 80 Q35 20 50 60 Q65 100 80 30" fill="none" stroke="#ff6b35" stroke-width="2.5"/>
-        </svg>
-      </div>
-      <div class="example-info">
-        <div class="example-name">SINE WAVE</div>
-        <div class="example-code">fill(BLACK) local w = floor(sin(x*.15)*15) if abs(y-w)&lt;=1 then return 8 end</div>
-        <span class="example-tag">→ Open in editor</span>
-      </div>
-    </a>
-
-    <a class="example-card" href="editor/index.html" target="_blank">
-      <div class="example-preview">
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-          <g transform="translate(50,50)">
-            <polygon points="0,-28 24,14 -24,14" fill="#fa194e" opacity="0.9"/>
-            <polygon points="0,-18 16,9 -16,9" fill="#596ca3" opacity="0.8"/>
-            <polygon points="0,-10 9,5 -9,5" fill="#ffe461" opacity="0.7"/>
-          </g>
-        </svg>
-      </div>
-      <div class="example-info">
-        <div class="example-name">CONCENTRIC CIRCLES</div>
-        <div class="example-code">local d=sqrt(x*x+y*y) return (floor(d/6)%16)+1</div>
-        <span class="example-tag">→ Open in editor</span>
-      </div>
-    </a>
-
+  <div id="examples-grid" class="examples-grid reveal">
+    <div class="gallery-loading">
+      <span class="gallery-dot"></span><span class="gallery-dot"></span><span class="gallery-dot"></span>
+    </div>
   </div>
 </section>
+
+<style>
+.gallery-loading {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 60px 0;
+}
+.gallery-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  animation: gdot 1.2s ease-in-out infinite;
+}
+.gallery-dot:nth-child(2) { animation-delay: .2s; }
+.gallery-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes gdot {
+  0%,80%,100% { opacity: 0.2; transform: scale(0.8); }
+  40%          { opacity: 1;   transform: scale(1.2); }
+}
+.gallery-error {
+  grid-column: 1 / -1;
+  text-align: center; padding: 40px;
+  font-family: var(--mono); font-size: 12px; color: var(--dim);
+}
+.example-mode-tag {
+  display: inline-block;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+  text-transform: uppercase; padding: 2px 6px;
+  border-radius: 2px; margin-bottom: 6px;
+}
+.example-mode-tag.replicube { background: rgba(0,212,255,0.1); color: var(--accent); }
+.example-mode-tag.replipaint { background: rgba(255,107,53,0.1); color: var(--accent2); }
+</style>
+
+<script>
+(async function loadGallery() {
+  const REPO    = 'miguelgomez75/Cc';
+  const BRANCH  = 'projects';
+  const GRID    = document.getElementById('examples-grid');
+  const API     = `https://api.github.com/repos/${REPO}/contents/?ref=${BRANCH}`;
+  const RAW     = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
+
+  function folderToTitle(name) {
+    // "001 Axis cube" → "AXIS CUBE"
+    return name.replace(/^\d+\s*/, '').toUpperCase();
+  }
+
+  function codePreview(code) {
+    // First non-comment, non-empty line
+    const line = code.split('\n').find(l => l.trim() && !l.trim().startsWith('--'));
+    return line ? line.trim().slice(0, 60) + (line.length > 60 ? '…' : '') : '';
+  }
+
+  try {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error('GitHub API: ' + res.status);
+    const entries = await res.json();
+
+    const folders = entries
+      .filter(e => e.type === 'dir')
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    if (!folders.length) throw new Error('No se encontraron proyectos');
+
+    // Fetch all project JSONs in parallel
+    const projects = await Promise.all(folders.map(async folder => {
+      try {
+        // Find the .json file: same name as folder slug or any .json
+        const contentsRes = await fetch(`https://api.github.com/repos/${REPO}/contents/${encodeURIComponent(folder.name)}?ref=${BRANCH}`);
+        const files = await contentsRes.json();
+        const jsonFile = files.find(f => f.name.endsWith('.json'));
+        if (!jsonFile) return null;
+
+        const jsonRes = await fetch(`${RAW}/${encodeURIComponent(folder.name)}/${jsonFile.name}`);
+        const data = await jsonRes.json();
+
+        const previewUrl = `${RAW}/${encodeURIComponent(folder.name)}/preview.png`;
+        const hash = btoa(JSON.stringify({ version: data.version || 1, mode: data.mode, gridSize: data.gridSize, code: data.code }));
+
+        return { folder: folder.name, data, previewUrl, hash };
+      } catch (e) {
+        return null;
+      }
+    }));
+
+    const valid = projects.filter(Boolean);
+    if (!valid.length) throw new Error('No se pudieron cargar los proyectos');
+
+    GRID.innerHTML = valid.map(({ folder, data, previewUrl, hash }) => `
+      <a class="example-card" href="editor/index.html#${hash}" target="_blank">
+        <div class="example-preview" style="background:#090b0f;">
+          <img
+            src="${previewUrl}"
+            alt="${folderToTitle(folder)}"
+            style="width:100%;height:100%;object-fit:cover;opacity:0.9;"
+            onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+          />
+          <div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:28px;color:var(--dim);">⬛</div>
+        </div>
+        <div class="example-info">
+          <span class="example-mode-tag ${data.mode || 'replicube'}">${data.mode || 'replicube'} · ${data.gridSize ? '±'+data.gridSize : ''}</span>
+          <div class="example-name">${folderToTitle(folder)}</div>
+          <div class="example-code">${codePreview(data.code || '')}</div>
+          <span class="example-tag">→ Open in editor</span>
+        </div>
+      </a>
+    `).join('');
+
+    // Re-trigger reveal observer for newly added cards
+    document.querySelectorAll('.example-card').forEach(el => {
+      el.style.opacity = '1';
+    });
+
+  } catch (err) {
+    GRID.innerHTML = `<div class="gallery-error">// no se pudieron cargar los proyectos<br>${err.message}<br><br><a href="https://github.com/${REPO}/tree/${BRANCH}" target="_blank" style="color:var(--accent)">ver en GitHub →</a></div>`;
+  }
+})();
+</script>
 
 <span class="sep"></span>
 
 <!-- CTA -->
 <div class="cta-section reveal">
-  <h2 class="cta-title">WRITE A FUNCTION.<br><span>GET A WORLD.</span></h2>
-  <p class="cta-sub">No installs. No servers. Open the editor and start coding.</p>
+  <h2 class="cta-title">ESCRIBE UNA FUNCIÓN.<br><span>OBTÉN UN MUNDO.</span></h2>
+  <p class="cta-sub">Sin instalaciones. Sin servidores. Abre el editor y empieza a programar.</p>
   <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
-    <a href="editor/index.html" class="btn-primary">▶ &nbsp;Launch Editor</a>
+    <a href="editor/index.html" class="btn-primary">▶ &nbsp;Abrir Editor</a>
     <a href="https://github.com/miguelgomez75/Cc" target="_blank" class="btn-secondary">⌥ &nbsp;GitHub</a>
   </div>
 </div>
 
 <!-- FOOTER -->
 <footer>
-  <span>REPLICUBE — Procedural Voxel Editor</span>
+  <span>REPLICUBE — Editor Voxel Procedimental</span>
   <div class="footer-links">
     <a href="https://github.com/miguelgomez75/Cc" target="_blank">GitHub</a>
     <a href="editor/index.html" target="_blank">Editor</a>
-    <a href="mailto:you@email.com">Contact</a>
+    <a href="mailto:you@email.com">Contacto</a>
   </div>
 </footer>
 
