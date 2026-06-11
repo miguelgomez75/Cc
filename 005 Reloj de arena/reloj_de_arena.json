@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "mode": "replicube",
+  "gridSize": 6,
+  "code": "if abs(x) + abs(z) < abs(y) + 1 then\n\tif abs(y) == 6 then return DARKBROWN\n\telseif y < 0 then return LIGHTBLUE end\n\treturn YELLOW\nend"
+}
