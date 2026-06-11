@@ -1,4 +1,4 @@
-# Project 2 - Skull
+# Project 3 - Calavera
 -------------------------
 
 <p align="center">
