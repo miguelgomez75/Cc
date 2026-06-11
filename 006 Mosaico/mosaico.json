@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "mode": "replicube",
+  "gridSize": 3,
+  "code": "color = abs(x) + abs(y) + 6\n\nif abs(z) < 2 then\n\tif color ~= 9 then\n\t\treturn color\n\tend\nend"
+}
