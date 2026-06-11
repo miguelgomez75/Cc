@@ -636,7 +636,29 @@ buildPaletteGrid('palette-grid-3d');
 buildPaletteGrid('palette-grid-2d');
 buildPaletteBar();
 
-editor.value = defaultCode.replicube;
+// Carga desde hash de URL si existe (usado por los ejemplos de la landing)
+(function loadFromURLHash() {
+  if (!location.hash || location.hash.length < 4) {
+    editor.value = defaultCode.replicube;
+    return;
+  }
+  try {
+    const payload = JSON.parse(atob(location.hash.slice(1)));
+    if (!payload.code) throw new Error('sin código');
+    _loadingFromURL = true;
+    if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
+    _loadingFromURL = false;
+    if (payload.gridSize && payload.gridSize !== gridSize) {
+      const sl = document.getElementById('size-slider');
+      if (sl) sl.value = payload.gridSize;
+      onSizeSlider(payload.gridSize);
+    }
+    editor.value = payload.code;
+  } catch (e) {
+    editor.value = defaultCode.replicube;
+  }
+})();
+
 updateLineNumbers();
 updateTokenCount();
 
