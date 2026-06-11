@@ -14,7 +14,7 @@
     <th>Cycles/Voxels</th>
   </tr>
   <tr>
-    <td align="center">6x6x6</td>
+    <td align="center">13x13x13</td>
     <td align="center"></td>
     <td align="center"></td>
   </tr>
