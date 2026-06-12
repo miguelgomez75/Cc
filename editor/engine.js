@@ -16,7 +16,7 @@ let isDragging = false, lastX = 0, lastY = 0;
 let theta = 0.7, phi = 0.6, radius = 28;
 let resizing = false, resizeStartX = 0, resizeStartW = 0;
 let _autoRunTimer = null;
-let _loadingFromURL = false; // ← flag para evitar que switchMode sobreescriba el editor
+let _loadingFromURL = false;
 
 const PNAMES = ['','WHITE','GREY','BLACK','PEACH','PINK','PURPLE','RED',
   'ORANGE','YELLOW','LIGHTGREEN','GREEN','DARKBLUE','BLUE','LIGHTBLUE','BROWN','DARKBROWN'];
@@ -262,7 +262,6 @@ function drawAnnotations() {
     ctx.globalAlpha=1;
   });
 
-  // Tooltip
   if (hoverVoxel) {
     const {x,y,z,rgb,colorIdx,colorName}=hoverVoxel;
     const l1='x:'+x+'  y:'+y+'  z:'+z, l2=colorIdx+'  '+colorName;
@@ -469,7 +468,6 @@ function exportSketch() {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  // nombre de archivo: replicube_YYYYMMDD_HHMM.json
   const now  = new Date();
   const ts   = now.getFullYear().toString()
     + String(now.getMonth()+1).padStart(2,'0')
@@ -495,20 +493,14 @@ function importSketch() {
       try {
         const payload = JSON.parse(evt.target.result);
         if (!payload.code) throw new Error('archivo inválido — falta "code"');
-
-        // Restaurar modo
         _loadingFromURL = true;
         if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
         _loadingFromURL = false;
-
-        // Restaurar tamaño de grid
         if (payload.gridSize && payload.gridSize !== gridSize) {
           const sl = document.getElementById('size-slider');
           if (sl) sl.value = payload.gridSize;
           onSizeSlider(payload.gridSize);
         }
-
-        // Restaurar código y ejecutar
         editor.value = payload.code;
         updateLineNumbers();
         updateTokenCount();
@@ -595,7 +587,6 @@ function switchMode(mode){
   document.getElementById('clip-controls').style.display=is3D?'flex':'none';
   document.getElementById('docs-replicube').style.display=is3D?'block':'none';
   document.getElementById('docs-replipaint').style.display=is3D?'none':'block';
-  // Solo sobreescribir el editor si NO estamos restaurando desde URL
   if (!_loadingFromURL) {
     editor.value=defaultCode[mode];
   }
@@ -636,33 +627,35 @@ buildPaletteGrid('palette-grid-3d');
 buildPaletteGrid('palette-grid-2d');
 buildPaletteBar();
 
-// Carga desde hash de URL si existe (usado por los ejemplos de la landing)
-(function loadFromURLHash() {
-  if (!location.hash || location.hash.length < 4) {
-    editor.value = defaultCode.replicube;
-    return;
-  }
+// Intenta cargar desde hash de URL (galería) o usa el código por defecto
+let _loadedFromHash = false;
+if (location.hash && location.hash.length >= 4) {
   try {
     const payload = JSON.parse(atob(location.hash.slice(1)));
-    if (!payload.code) throw new Error('sin código');
-    _loadingFromURL = true;
-    if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
-    _loadingFromURL = false;
-    if (payload.gridSize && payload.gridSize !== gridSize) {
-      const sl = document.getElementById('size-slider');
-      if (sl) sl.value = payload.gridSize;
-      onSizeSlider(payload.gridSize);
+    if (payload.code) {
+      _loadingFromURL = true;
+      if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
+      _loadingFromURL = false;
+      if (payload.gridSize && payload.gridSize !== gridSize) {
+        const sl = document.getElementById('size-slider');
+        if (sl) sl.value = payload.gridSize;
+        onSizeSlider(payload.gridSize);
+      }
+      editor.value = payload.code;
+      _loadedFromHash = true;
     }
-    editor.value = payload.code;
   } catch (e) {
-    editor.value = defaultCode.replicube;
+    // hash inválido, continúa con el código por defecto
   }
-})();
+}
+if (!_loadedFromHash) {
+  editor.value = defaultCode.replicube;
+}
 
 updateLineNumbers();
 updateTokenCount();
 
-// Expose globals needed by HTML onclick attributes
+// Expose globals
 window.runCode       = runCode;
 window.clearAll      = clearAll;
 window.toggleDocs    = toggleDocs;
@@ -676,6 +669,7 @@ window.switchMode    = switchMode;
 window.onSizeSlider  = onSizeSlider;
 window.onClipSlider  = onClipSlider;
 
+// Ejecuta el código cargado (por defecto o desde hash)
 setTimeout(()=>runCode(), 200);
 
 }); // end DOMContentLoaded
