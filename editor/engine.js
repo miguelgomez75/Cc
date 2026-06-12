@@ -636,31 +636,46 @@ buildPaletteGrid('palette-grid-3d');
 buildPaletteGrid('palette-grid-2d');
 buildPaletteBar();
 
-// Carga desde hash de URL si existe (usado por los ejemplos de la landing)
-(function loadFromURLHash() {
-  if (!location.hash || location.hash.length < 4) {
-    editor.value = defaultCode.replicube;
-    return;
-  }
-  try {
-    const payload = JSON.parse(atob(location.hash.slice(1)));
-    if (!payload.code) throw new Error('sin código');
-    _loadingFromURL = true;
-    if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
-    _loadingFromURL = false;
-    if (payload.gridSize && payload.gridSize !== gridSize) {
-      const sl = document.getElementById('size-slider');
-      if (sl) sl.value = payload.gridSize;
-      onSizeSlider(payload.gridSize);
-    }
-    editor.value = payload.code;
-  } catch (e) {
-    editor.value = defaultCode.replicube;
-  }
-})();
-
+editor.value = defaultCode.replicube;
 updateLineNumbers();
 updateTokenCount();
+
+// Carga proyecto desde ?project=CARPETA si viene de la galería
+// Se ejecuta después del init completo para que todo el DOM esté listo
+const _projectParam = new URLSearchParams(location.search).get('project');
+if (_projectParam) {
+  const REPO   = 'miguelgomez75/Cc';
+  const BRANCH = 'projects';
+  const RAW    = 'https://raw.githubusercontent.com/' + REPO + '/' + BRANCH;
+
+  logMsg('// cargando: ' + _projectParam, 'log-info');
+
+  fetch('https://api.github.com/repos/' + REPO + '/contents/' + encodeURIComponent(_projectParam) + '?ref=' + BRANCH)
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(files => {
+      const jsonFile = files.find(f => f.name.endsWith('.json'));
+      if (!jsonFile) throw new Error('no se encontró .json en la carpeta');
+      return fetch(RAW + '/' + encodeURIComponent(_projectParam) + '/' + jsonFile.name);
+    })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(payload => {
+      if (!payload.code) throw new Error('el JSON no contiene código');
+      _loadingFromURL = true;
+      if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
+      _loadingFromURL = false;
+      if (payload.gridSize && payload.gridSize !== gridSize) {
+        const sl = document.getElementById('size-slider');
+        if (sl) sl.value = payload.gridSize;
+        onSizeSlider(payload.gridSize);
+      }
+      editor.value = payload.code;
+      updateLineNumbers();
+      updateTokenCount();
+      runCode();
+      logMsg('// ok — ' + _projectParam, 'log-success');
+    })
+    .catch(err => logMsg('// error al cargar proyecto: ' + err.message, 'log-error'));
+}
 
 // Expose globals needed by HTML onclick attributes
 window.runCode       = runCode;
@@ -676,6 +691,7 @@ window.switchMode    = switchMode;
 window.onSizeSlider  = onSizeSlider;
 window.onClipSlider  = onClipSlider;
 
-setTimeout(()=>runCode(), 200);
+// Solo auto-ejecuta el código por defecto si no estamos cargando un proyecto
+if (!new URLSearchParams(location.search).get('project')) setTimeout(()=>runCode(), 200);
 
 }); // end DOMContentLoaded
