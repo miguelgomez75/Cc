@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Replicube — Reimplementación de un Editor Voxel Procedimental</title>
-<meta name="description" content="Reimplementación propia del editor Replicube — vóxeles 3D y píxeles 2D con scripting Lua, Three.js y WebGL. Sin instalación, funciona en el navegador.">
+<title>Replicube — Editor Voxel y Pixel Procedimental</title>
+<meta name="description" content="Editor procedimental de vóxeles 3D y píxeles 2D con scripting Lua, Three.js y WebGL. Sin instalación, funciona en el navegador.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -680,11 +680,11 @@ footer {
 
 <!-- HERO -->
 <div class="hero">
-  <p class="hero-eyebrow">// Reimplementación de un editor de creative coding</p>
+  <p class="hero-eyebrow">// Herramienta de creative coding para el navegador</p>
   <h1 class="hero-title">REPLI<span>CUBE</span></h1>
-  <p class="hero-subtitle-mono">Vóxeles 3D y Pixel Art 2D — Inspirado en <a href="https://www.walaber.com/replicube" target="_blank" style="color:inherit;text-decoration:underline;text-underline-offset:3px;">Replicube</a></p>
+  <p class="hero-subtitle-mono">Vóxeles 3D y Pixel Art 2D — Con Lua</p>
   <p class="hero-desc">
-    Reimplementación propia del editor <a href="https://www.walaber.com/replicube" target="_blank" style="color:var(--accent);text-decoration:none;">Replicube</a> original. Misma idea central: una función recibe coordenadas y devuelve un color — pero construido desde cero con Three.js, Fengari y Canvas API, y ampliado con funciones propias como exportación, importación y un modo 2D de pixel art.
+    Escribe una función. Obtén un mundo 3D. Un editor procedimental de vóxeles y píxeles que funciona completamente en el navegador — sin instalaciones, sin servidores, sin pasos de compilación.
   </p>
   <div class="hero-actions">
     <a href="editor/index.html" class="btn-primary">▶ &nbsp;Abrir Editor</a>
@@ -780,8 +780,8 @@ footer {
 <section id="stack">
   <div class="reveal">
     <span class="section-label">// stack técnico</span>
-    <h2 class="section-title">Stack Técnico</h2>
-    <p class="section-desc">Todo el proyecto funciona como archivos estáticos desplegados en GitHub Pages — sin servidores, sin compilación, sin gestores de paquetes. Inspirado en la arquitectura de <a href="https://www.walaber.com/replicube" target="_blank" style="color:var(--accent);text-decoration:none;">walaber.com/replicube</a> y reimplementado de forma independiente.</p>
+    <h2 class="section-title">Cero Backend.<br>Máxima Potencia.</h2>
+    <p class="section-desc">Cada componente funciona completamente en el navegador. Sin servidores, sin compilación, sin gestores de paquetes.</p>
   </div>
   <div class="stack-grid reveal">
     <div class="stack-card">
@@ -817,8 +817,8 @@ footer {
 <section id="features">
   <div class="reveal">
     <span class="section-label">// características</span>
-    <h2 class="section-title">Qué Implementé</h2>
-    <p class="section-desc">El concepto original es de Replicube. Estas son las piezas técnicas que tuve que construir para reproducirlo en el navegador, más las extensiones propias que añadí.</p>
+    <h2 class="section-title">Cómo Funciona</h2>
+    <p class="section-desc">El modelo es simple: escribe una función pura que recibe coordenadas y devuelve un color. El motor hace el resto.</p>
   </div>
 
   <div class="code-block reveal" data-lang="lua">
@@ -858,8 +858,8 @@ footer {
     </div>
     <div class="feature-card">
       <div class="feature-num">06 ——</div>
-      <div class="feature-title">EXPORTAR / IMPORTAR <span style="font-family:var(--mono);font-size:9px;color:var(--green);border:1px solid var(--green);padding:1px 6px;margin-left:6px;vertical-align:middle;">PROPIO</span></div>
-      <div class="feature-desc">Funcionalidad añadida respecto al original: exporta el sketch como JSON con código y tamaño de grid, e impórtalo para restaurar el estado exacto — sin cuentas, sin servidores.</div>
+      <div class="feature-title">EXPORTAR / IMPORTAR</div>
+      <div class="feature-desc">Exporta tu sketch como archivo JSON con el código y el tamaño del grid. Importa cualquier archivo para restaurar el estado exacto del editor — sin cuentas, sin servidores.</div>
     </div>
   </div>
 </section>
@@ -870,8 +870,8 @@ footer {
 <section id="challenges">
   <div class="reveal">
     <span class="section-label">// notas de ingeniería</span>
-    <h2 class="section-title">Retos de Implementación</h2>
-    <p class="section-desc">Reproducir el comportamiento de Replicube sin acceso a su código fuente implicó resolver estos problemas técnicos desde cero.</p>
+    <h2 class="section-title">Retos Técnicos</h2>
+    <p class="section-desc">Los problemas interesantes que hubo que resolver para que todo esto funcione en un navegador.</p>
   </div>
   <div class="challenges-list reveal">
     <div class="challenge-item">
@@ -899,8 +899,8 @@ footer {
 <section id="examples">
   <div class="reveal">
     <span class="section-label">// galería</span>
-    <h2 class="section-title">Proyectos Realizados con el Editor</h2>
-    <p class="section-desc">Una vez terminado el editor, lo usé para crear estos proyectos en Lua — un lenguaje nuevo para mí. Ninguno de estos diseños existe en el Replicube original.</p>
+    <h2 class="section-title">Mis Proyectos</h2>
+    <p class="section-desc">Haz clic en cualquier proyecto para abrirlo en el editor.</p>
   </div>
   <div id="examples-grid" class="examples-grid reveal">
     <div class="gallery-loading">
@@ -984,7 +984,9 @@ footer {
         const data = await jsonRes.json();
 
         const previewUrl = `${RAW}/${encodeURIComponent(folder.name)}/preview.png`;
-        return { folder: folder.name, data, previewUrl };
+        const hash = btoa(JSON.stringify({ version: data.version || 1, mode: data.mode, gridSize: data.gridSize, code: data.code }));
+
+        return { folder: folder.name, data, previewUrl, hash };
       } catch (e) {
         return null;
       }
@@ -994,7 +996,7 @@ footer {
     if (!valid.length) throw new Error('No se pudieron cargar los proyectos');
 
     GRID.innerHTML = valid.map(({ folder, data, previewUrl, hash }) => `
-      <a class="example-card" href="editor/index.html?project=${encodeURIComponent(folder.name)}" target="_blank">
+      <a class="example-card" href="editor/index.html#${hash}" target="_blank">
         <div class="example-preview" style="background:#090b0f;">
           <img
             src="${previewUrl}"
@@ -1008,7 +1010,7 @@ footer {
           <span class="example-mode-tag ${data.mode || 'replicube'}">${data.mode || 'replicube'} · ${data.gridSize ? '±'+data.gridSize : ''}</span>
           <div class="example-name">${folderToTitle(folder)}</div>
           <div class="example-code">${codePreview(data.code || '')}</div>
-          <span class="example-tag">→ Abrir en el editor</span>
+          <span class="example-tag">→ Open in editor</span>
         </div>
       </a>
     `).join('');
@@ -1028,8 +1030,8 @@ footer {
 
 <!-- CTA -->
 <div class="cta-section reveal">
-  <h2 class="cta-title">REIMPLEMENTADO.<br><span>AMPLIADO. TUYO.</span></h2>
-  <p class="cta-sub">Una reimplementación del editor Replicube, construida desde cero y desplegada en el navegador — más los proyectos Lua creados con él.</p>
+  <h2 class="cta-title">ESCRIBE UNA FUNCIÓN.<br><span>OBTÉN UN MUNDO.</span></h2>
+  <p class="cta-sub">Sin instalaciones. Sin servidores. Abre el editor y empieza a programar.</p>
   <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
     <a href="editor/index.html" class="btn-primary">▶ &nbsp;Abrir Editor</a>
     <a href="https://github.com/miguelgomez75/Cc" target="_blank" class="btn-secondary">⌥ &nbsp;GitHub</a>
