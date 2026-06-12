@@ -942,20 +942,18 @@ footer {
 </style>
 
 <script>
-(async function loadGallery() {
-  const REPO    = 'miguelgomez75/Cc';
-  const BRANCH  = 'projects';
-  const GRID    = document.getElementById('examples-grid');
-  const API     = `https://api.github.com/repos/${REPO}/contents/?ref=${BRANCH}`;
-  const RAW     = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
+  (async function loadGallery() {
+  const REPO   = 'miguelgomez75/Cc';
+  const BRANCH = 'projects';
+  const GRID   = document.getElementById('examples-grid');
+  const API    = `https://api.github.com/repos/${REPO}/contents/?ref=${BRANCH}`;
+  const RAW    = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
 
   function folderToTitle(name) {
-    // "001 Axis cube" → "AXIS CUBE"
     return name.replace(/^\d+\s*/, '').toUpperCase();
   }
 
   function codePreview(code) {
-    // First non-comment, non-empty line
     const line = code.split('\n').find(l => l.trim() && !l.trim().startsWith('--'));
     return line ? line.trim().slice(0, 60) + (line.length > 60 ? '…' : '') : '';
   }
@@ -971,21 +969,46 @@ footer {
 
     if (!folders.length) throw new Error('No se encontraron proyectos');
 
-    // Fetch all project JSONs in parallel
     const projects = await Promise.all(folders.map(async folder => {
       try {
-        // Find the .json file: same name as folder slug or any .json
-        const contentsRes = await fetch(`https://api.github.com/repos/${REPO}/contents/${encodeURIComponent(folder.name)}?ref=${BRANCH}`);
+        const contentsRes = await fetch(
+          `https://api.github.com/repos/${REPO}/contents/${encodeURIComponent(folder.name)}?ref=${BRANCH}`
+        );
+        if (!contentsRes.ok) return null;
         const files = await contentsRes.json();
+
         const jsonFile = files.find(f => f.name.endsWith('.json'));
-        if (!jsonFile) return null;
+        const luaFile  = files.find(f => f.name.endsWith('.lua'));
 
-        const jsonRes = await fetch(`${RAW}/${encodeURIComponent(folder.name)}/${jsonFile.name}`);
-        const data = await jsonRes.json();
+        let data = null;
 
+        if (jsonFile) {
+          const jsonRes = await fetch(
+            `${RAW}/${encodeURIComponent(folder.name)}/${jsonFile.name}`
+          );
+          if (jsonRes.ok) data = await jsonRes.json();
+        }
+
+        // Fallback: leer code.lua si no hay JSON o si JSON no tiene código
+        if ((!data || !data.code) && luaFile) {
+          const luaRes = await fetch(
+            `${RAW}/${encodeURIComponent(folder.name)}/${luaFile.name}`
+          );
+          if (luaRes.ok) {
+            const code = await luaRes.text();
+            data = { version: 1, mode: data?.mode || 'replicube', gridSize: data?.gridSize || 6, code };
+          }
+        }
+
+        if (!data || !data.code) return null;
+
+        // Codificar payload como hash para pasarlo al editor
+        const hash = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
         const previewUrl = `${RAW}/${encodeURIComponent(folder.name)}/preview.png`;
-        return { folder: folder.name, data, previewUrl };
+
+        return { folder: folder.name, data, previewUrl, hash };
       } catch (e) {
+        console.warn('Failed to load project:', folder.name, e);
         return null;
       }
     }));
@@ -994,7 +1017,7 @@ footer {
     if (!valid.length) throw new Error('No se pudieron cargar los proyectos');
 
     GRID.innerHTML = valid.map(({ folder, data, previewUrl, hash }) => `
-      <a class="example-card" href="editor/index.html?project=${encodeURIComponent(folder.name)}" target="_blank">
+      <a class="example-card" href="editor/index.html#${hash}" target="_blank">
         <div class="example-preview" style="background:#090b0f;">
           <img
             src="${previewUrl}"
@@ -1005,7 +1028,7 @@ footer {
           <div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:28px;color:var(--dim);">⬛</div>
         </div>
         <div class="example-info">
-          <span class="example-mode-tag ${data.mode || 'replicube'}">${data.mode || 'replicube'} · ${data.gridSize ? '±'+data.gridSize : ''}</span>
+          <span class="example-mode-tag ${data.mode || 'replicube'}">${data.mode || 'replicube'} · ±${data.gridSize || 6}</span>
           <div class="example-name">${folderToTitle(folder)}</div>
           <div class="example-code">${codePreview(data.code || '')}</div>
           <span class="example-tag">→ Abrir en el editor</span>
@@ -1013,13 +1036,14 @@ footer {
       </a>
     `).join('');
 
-    // Re-trigger reveal observer for newly added cards
-    document.querySelectorAll('.example-card').forEach(el => {
-      el.style.opacity = '1';
-    });
+    document.querySelectorAll('.example-card').forEach(el => { el.style.opacity = '1'; });
 
   } catch (err) {
-    GRID.innerHTML = `<div class="gallery-error">// no se pudieron cargar los proyectos<br>${err.message}<br><br><a href="https://github.com/${REPO}/tree/${BRANCH}" target="_blank" style="color:var(--accent)">ver en GitHub →</a></div>`;
+    GRID.innerHTML = `
+      <div class="gallery-error">
+        // no se pudieron cargar los proyectos<br>${err.message}<br><br>
+        <a href="https://github.com/${REPO}/tree/${BRANCH}" target="_blank" style="color:var(--accent)">ver en GitHub →</a>
+      </div>`;
   }
 })();
 </script>
