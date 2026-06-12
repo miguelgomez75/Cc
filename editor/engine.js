@@ -631,7 +631,7 @@ buildPaletteBar();
 let _loadedFromHash = false;
 if (location.hash && location.hash.length >= 4) {
   try {
-    const payload = JSON.parse(atob(location.hash.slice(1)));
+    const payload = JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1)))));
     if (payload.code) {
       _loadingFromURL = true;
       if (payload.mode && payload.mode !== currentMode) switchMode(payload.mode);
