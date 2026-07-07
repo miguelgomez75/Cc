@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "mode": "replicube",
+  "gridSize": 5,
+  "code": "-- El código recibe x, y, z → devuelve color (1-16)\n-- 0 o sin return = vacío | >16 hace wrap (17→1…)\nabsx = abs(x)\n\nif inrange(y,-5,-3) and inrange(z,-1,1) and inrange(absx,2,4) then\nreturn 7\nend\n\nif z == 0 then\n\n  if (inrange(y,-2, -1) and absx == 3) or (y       == 0 and x == 3) then\n    return 11\n  end\n\n  if (inrange(y,0,1) and x == -2) or (x == 2 and inrange(y,1,2)) then\n    return 11\n  end\n\n  if (y == 2 and x == -1) then\n    return 11\n  end\n\n  if inrange(x,0,1) and y == 3 then\n    return 11\n  end\n\n  if y == 4 and x == 1 then\n    return 11\n  end\nend"
+}
